@@ -4,7 +4,7 @@ dns.setServers(["1.1.1.1", "8.8.8.8"]);
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 // Load environment variables
 dotenv.config();
@@ -39,6 +39,14 @@ client.connect(() => console.log("connecting to mongo db")).catch(console.log.di
 
 const db = client.db('PromptVerse');
 const prompts = db.collection('prompts');
+const reviews = db.collection('reviews');
+const bookmarks = db.collection('bookmarks');
+const payments = db.collection('payments');
+const reports = db.collection('reports');
+
+
+
+
 
 // prompts related api 
 app.post('/api/prompts', async (req, res) => {
@@ -105,6 +113,40 @@ app.get('/api/admin/prompts', async (req, res) => {
         })
     }
 });
+
+app.delete('/api/prompt/:id', async (req, res) => {
+
+    const { id } = req.params;
+
+    console.log(id);
+
+    const query = {
+        _id: new ObjectId(id)
+    }
+
+    try {
+
+        const deletePrompt = await prompts.deleteOne(query);
+
+        console.log(deletePrompt);
+
+        res.status(200).send({
+            success: true,
+            message: 'Delete prompt successfully',
+            data: deletePrompt
+        });
+
+    } catch (error) {
+
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Delete prompt failed',
+            error: error.message
+        });
+    }
+});
+
 
 module.exports = app;
 

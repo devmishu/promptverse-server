@@ -86,6 +86,26 @@ app.get('/api/prompts', async (req, res) => {
     }
 });
 
+app.get('/api/admin/prompts', async (req, res) => {
+    try {
+
+        const result = await prompts.find().toArray();
+
+        res.status(200).send({
+            success: true,
+            message: 'all prompts get successfully',
+            data: result
+        })
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Failed get  all prompts ',
+            error: error.message
+        })
+    }
+});
+
 module.exports = app;
 
 

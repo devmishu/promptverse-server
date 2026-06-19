@@ -30,90 +30,82 @@ const client = new MongoClient(uri, {
     }
 });
 
-async function run() {
-    const db = client.db('PromptVerse');
-    const prompts = db.collection('prompts');
+client.connect(() => console.log("connecting to mongo db")).catch(console.log.dir)
 
+// async function run() {
+//     try {
+// Connect the client to the server	(optional starting in v4.7)
+// await client.connect();
 
+const db = client.db('PromptVerse');
+const prompts = db.collection('prompts');
 
-
-
-
-
-
-
-
-
-
+// prompts related api 
+app.post('/api/prompts', async (req, res) => {
     try {
-        // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        const prompt = req.body;
+        const result = await prompts.insertOne(prompt);
 
-        // prompts related api 
-        app.post('/api/prompts', async (req, res) => {
-            try {
-                const prompt = req.body;
-                const result = await prompts.insertOne(prompt);
-
-                res.status(200).send({
-                    success: true,
-                    message: 'prompt added successfully',
-                    data: result
-                })
-            } catch (error) {
-                console.log(error);
-                res.status(500).send({
-                    success: false,
-                    message: 'Failed to add prompt ',
-                    error: error.message
-                })
-            }
-        });
-
-        app.get('/api/prompts', async (req, res) => {
-            try {
-                const query = {};
-                if (req.query.userId) {
-                    query.userId = req.query.userId;
-                }
-
-                const cursor = prompts.find(query)
-                const result = await cursor.toArray();
-
-                res.status(200).send({
-                    success: true,
-                    message: 'prompts get successfully',
-                    data: result
-                })
-            } catch (error) {
-                console.log(error);
-                res.status(500).send({
-                    success: false,
-                    message: 'Failed get  prompts ',
-                    error: error.message
-                })
-            }
-        });
-
-
-
-
-
-
-
-
-
-
-
-        // Send a ping to confirm a successful connection
-        // await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
-    } finally {
-        // Ensures that the client will close when you finish/error
-        // await client.close();
+        res.status(200).send({
+            success: true,
+            message: 'prompt added successfully',
+            data: result
+        })
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Failed to add prompt ',
+            error: error.message
+        })
     }
-}
-run().catch(console.dir);
+});
+
+app.get('/api/prompts', async (req, res) => {
+    try {
+        const query = {};
+        if (req.query.userId) {
+            query.userId = req.query.userId;
+        }
+
+        const cursor = prompts.find(query)
+        const result = await cursor.toArray();
+
+        res.status(200).send({
+            success: true,
+            message: 'prompts get successfully',
+            data: result
+        })
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Failed get  prompts ',
+            error: error.message
+        })
+    }
+});
+
+module.exports = app;
+
+
+
+
+
+
+
+
+
+
+// Send a ping to confirm a successful connection
+// await client.db("admin").command({ ping: 1 });
+//         console.log("Pinged your deployment. You successfully connected to MongoDB!");
+//     } finally {
+//         // Ensures that the client will close when you finish/error
+//         // await client.close();
+//     }
+// }
+// run().catch(console.dir);
 
 
 

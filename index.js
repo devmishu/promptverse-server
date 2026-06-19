@@ -148,6 +148,36 @@ app.delete('/api/prompt/:id', async (req, res) => {
 });
 
 
+// edit my added cars
+app.patch('/api/prompts/:id', async (req, res) => {
+
+    const data = req.body;
+    const { id } = req.params;
+    const query = {
+        _id: new ObjectId(id)
+    }
+    const document = {
+        $set: data
+    }
+
+    try {
+        const editedPrompt = await prompts.updateOne(query, document);
+        res.status(200).send({
+            success: true,
+            message: 'Edit prompt successfully',
+            data: editedPrompt
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Edit prompt  failed',
+            error: error.message
+        });
+    }
+});
+
+
 module.exports = app;
 
 

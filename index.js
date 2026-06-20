@@ -100,6 +100,69 @@ app.get('/api/prompts', async (req, res) => {
     }
 });
 
+app.get('/api/prompts/:id', async (req, res) => {
+    try {
+
+        const { id } = req.params;
+
+        const prompt = await prompts.findOne({
+            _id: new ObjectId(id)
+        });
+
+        if (!prompt) {
+            return res.status(404).send({
+                success: false,
+                message: 'Prompt not found'
+            });
+        }
+
+        // Public Prompt
+        if (prompt.visibility === 'free') {
+            return res.status(200).send({
+                success: true,
+                message: 'Prompt fetched successfully',
+                data: prompt
+            });
+        }
+
+        // Logged in User
+        const user = await users.findOne({
+            email: req.user.email
+        });
+
+        // Premium User 
+        if (user?.plan === 'premium') {
+            return res.status(200).send({
+                success: true,
+                message: 'Prompt fetched successfully',
+                data: prompt
+            });
+        }
+
+        // Free User + Private Prompt
+        return res.status(200).send({
+            success: true,
+            message: 'Premium prompt locked',
+            data: {
+                ...prompt,
+                content: null,
+                locked: true
+            }
+        });
+
+    } catch (error) {
+
+        console.log(error);
+
+        res.status(500).send({
+            success: false,
+            message: 'Failed to get prompt',
+            error: error.message
+        });
+
+    }
+});
+
 
 
 
@@ -216,6 +279,7 @@ app.patch('/api/prompts/:id', async (req, res) => {
         });
     }
 });
+
 
 
 module.exports = app;

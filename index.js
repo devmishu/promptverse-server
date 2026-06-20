@@ -43,6 +43,7 @@ const reviews = db.collection('reviews');
 const bookmarks = db.collection('bookmarks');
 const payments = db.collection('payments');
 const reports = db.collection('reports');
+const users = db.collection('users');
 
 
 
@@ -71,6 +72,43 @@ app.post('/api/prompts', async (req, res) => {
 
 app.get('/api/prompts', async (req, res) => {
     try {
+
+        const result = await prompts
+            .find({})
+            .project({
+                title: 1,
+                description: 1,
+                thumbnail: 1,
+                category: 1,
+                aiTool: 1,
+                difficulty: 1,
+                visibility: 1,
+                copyCount: 1
+            })
+            .toArray();
+
+        res.status(200).send({
+            success: true,
+            data: result
+        });
+
+    } catch (error) {
+        res.status(500).send({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+
+
+
+
+
+
+
+app.get('/api/my/prompts', async (req, res) => {
+    try {
         const query = {};
         if (req.query.userId) {
             query.userId = req.query.userId;
@@ -93,6 +131,8 @@ app.get('/api/prompts', async (req, res) => {
         })
     }
 });
+
+
 
 app.get('/api/admin/prompts', async (req, res) => {
     try {

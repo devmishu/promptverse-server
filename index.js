@@ -406,6 +406,30 @@ app.post('/api/reviews', async (req, res) => {
         });
     }
 });
+app.get('/api/my/reviews', async (req, res) => {
+    try {
+        const query = {};
+        if (req.query.userId) {
+            query.userId = req.query.userId;
+        }
+
+        const cursor = await reviews.find(query)
+        const result = await cursor.toArray();
+
+        res.status(200).send({
+            success: true,
+            message: 'my reviews get successfully',
+            data: result
+        })
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Failed get  my reviews ',
+            error: error.message
+        })
+    }
+});
 
 // ১. নতুন রিপোর্ট তৈরি করার POST API
 app.post('/api/reports', async (req, res) => {
@@ -450,7 +474,28 @@ app.post('/api/reports', async (req, res) => {
             error: error.message
         });
     }
-}); 
+});
+
+app.get('/api/admin/reports', async (req, res) => {
+    try {
+
+        const result = await reports.find().toArray();
+
+        res.status(200).send({
+            success: true,
+            message: 'all reports get successfully',
+            data: result
+        })
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Failed get  all reports ',
+            error: error.message
+        })
+    }
+});
+
 
 
 

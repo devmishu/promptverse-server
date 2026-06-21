@@ -407,6 +407,51 @@ app.post('/api/reviews', async (req, res) => {
     }
 });
 
+// ১. নতুন রিপোর্ট তৈরি করার POST API
+app.post('/api/reports', async (req, res) => {
+    try {
+        const report = req.body;
+
+        // বডি থেকে userId এবং promptId আলাদা করা হচ্ছে
+        const { userId, promptId } = report;
+
+        if (!userId || !promptId) {
+            return res.status(400).send({
+                success: false,
+                message: 'userId and promptId are required'
+            });
+        }
+
+        // ডাটাবেজে চেক করা হচ্ছে এই ইউজার এই প্রম্পটে অলরেডি রিপোর্ট দিয়েছে কিনা
+        const existingReport = await reports.findOne({ userId: userId, promptId: promptId });
+
+        if (existingReport) {
+            return res.status(400).send({
+                success: false,
+                alreadyReported: true, // ফ্রন্টেন্ডে ট্র্যাকিং সহজ করার জন্য
+                message: 'You have already reported this prompt.'
+            });
+        }
+
+        // অলরেডি রিপোর্ট না থাকলে নতুন রিপোর্ট ডাটাবেজে সেভ হবে
+        const result = await reports.insertOne(report);
+
+        res.status(200).send({
+            success: true,
+            message: 'Report submitted successfully',
+            data: result
+        });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Failed to submit report',
+            error: error.message
+        });
+    }
+}); 
+
 
 
 module.exports = app;

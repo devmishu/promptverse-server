@@ -164,12 +164,6 @@ app.get('/api/prompts/:id', async (req, res) => {
 });
 
 
-
-
-
-
-
-
 app.get('/api/my/prompts', async (req, res) => {
     try {
         const query = {};
@@ -194,8 +188,6 @@ app.get('/api/my/prompts', async (req, res) => {
         })
     }
 });
-
-
 
 app.get('/api/admin/prompts', async (req, res) => {
     try {
@@ -250,7 +242,6 @@ app.delete('/api/prompt/:id', async (req, res) => {
     }
 });
 
-
 // edit my added cars
 app.patch('/api/prompts/:id', async (req, res) => {
 
@@ -275,6 +266,142 @@ app.patch('/api/prompts/:id', async (req, res) => {
         res.status(500).send({
             success: false,
             message: 'Edit prompt  failed',
+            error: error.message
+        });
+    }
+});
+
+
+// bookmark related api
+// app.post('/api/bookmarks', async (req, res) => {
+//     try {
+//         const bookmark = req.body;
+//         const result = await bookmarks.insertOne(bookmark);
+
+//         res.status(200).send({
+//             success: true,
+//             message: 'prompt bookmarked successfully',
+//             data: result
+//         })
+//     } catch (error) {
+//         console.log(error);
+//         res.status(500).send({
+//             success: false,
+//             message: 'Failed to add prompt ',
+//             error: error.message
+//         })
+//     }
+// });
+
+app.post('/api/bookmarks', async (req, res) => {
+    try {
+        const bookmark = req.body;
+
+        // ১. বডি থেকে userId এবং promptId আলাদা করা হচ্ছে
+        const { userId, _id: promptId } = bookmark; // আপনার ফ্রন্টেন্ড স্ট্রাকচারে প্রম্পটের আইডিটি সম্ভবত _id নামে যাচ্ছে
+
+        if (!userId || !promptId) {
+            return res.status(400).send({
+                success: false,
+                message: 'userId and promptId are required'
+            });
+        }
+
+        // ২. ডাটাবেজে চেক করা হচ্ছে এই ইউজার এই প্রম্পট অলরেডি বুকমার্ক করেছে কিনা
+        const existingBookmark = await bookmarks.findOne({ userId: userId, _id: promptId });
+
+        if (existingBookmark) {
+            return res.status(400).send({
+                success: false,
+                alreadyBookmarked: true, // ফ্রন্টেন্ড ট্র্যাকিংয়ের জন্য
+                message: 'You have already bookmarked this prompt.'
+            });
+        }
+
+        // ৩. ডুপ্লিকেট না থাকলে নতুন বুকমার্ক ইনসার্ট হবে
+        const result = await bookmarks.insertOne(bookmark);
+
+        res.status(200).send({
+            success: true,
+            message: 'Prompt bookmarked successfully',
+            data: result
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Failed to add bookmark',
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/my/bookmarks', async (req, res) => {
+    try {
+        const query = {};
+        if (req.query.userId) {
+            query.userId = req.query.userId;
+        }
+
+        const cursor = await bookmarks.find(query)
+        const result = await cursor.toArray();
+
+        res.status(200).send({
+            success: true,
+            message: 'my bookmarks get successfully',
+            data: result
+        })
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Failed get  my bookmarks ',
+            error: error.message
+        })
+    }
+});
+
+
+
+app.post('/api/reviews', async (req, res) => {
+    try {
+        const review = req.body;
+
+        // ১. বডি থেকে userId এবং promptId আলাদা করে নেওয়া হচ্ছে (আপনার ডাটা স্ট্রাকচার অনুযায়ী ফিল্ডের নাম নিশ্চিত হয়ে নিবেন)
+        const { userId, promptId } = review;
+
+        if (!userId || !promptId) {
+            return res.status(400).send({
+                success: false,
+                message: 'userId and promptId are required'
+            });
+        }
+
+        // ২. ডাটাবেজে চেক করা হচ্ছে এই ইউজার এই প্রম্পটে অলরেডি রিভিউ দিয়েছে কিনা
+        const existingReview = await reviews.findOne({ userId: userId, promptId: promptId });
+
+        if (existingReview) {
+            return res.status(400).send({
+                success: false,
+                alreadyReviewed: true, // ফ্রন্টেন্ডে ট্র্যাকিং সহজ করার জন্য
+                message: 'You have already reviewed this prompt.'
+            });
+        }
+
+        // ৩. অলরেডি রিভিউ না থাকলে নতুন রিভিউ ডাটাবেজে সেভ হবে
+        const result = await reviews.insertOne(review);
+
+        res.status(200).send({
+            success: true,
+            message: 'Review added successfully',
+            data: result
+        });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Failed to add review',
             error: error.message
         });
     }

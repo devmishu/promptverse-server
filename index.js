@@ -298,7 +298,7 @@ app.post('/api/bookmarks', async (req, res) => {
         const bookmark = req.body;
 
         // ১. বডি থেকে userId এবং promptId আলাদা করা হচ্ছে
-        const { userId, _id: promptId } = bookmark; // আপনার ফ্রন্টেন্ড স্ট্রাকচারে প্রম্পটের আইডিটি সম্ভবত _id নামে যাচ্ছে
+        const { userId, promptId } = bookmark; // আপনার ফ্রন্টেন্ড স্ট্রাকচারে প্রম্পটের আইডিটি সম্ভবত _id নামে যাচ্ছে
 
         if (!userId || !promptId) {
             return res.status(400).send({
@@ -361,6 +361,38 @@ app.get('/api/my/bookmarks', async (req, res) => {
     }
 });
 
+app.delete('/api/bookmarks/:id', async (req, res) => {
+
+    const { id } = req.params;
+
+    console.log(id);
+
+    const query = {
+        _id: new ObjectId(id)
+    }
+
+    try {
+
+        const deleteBookmark = await bookmarks.deleteOne(query);
+
+        console.log(deleteBookmark);
+
+        res.status(200).send({
+            success: true,
+            message: 'Delete bookmark successfully',
+            data: deleteBookmark
+        });
+
+    } catch (error) {
+
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Delete bookmark failed',
+            error: error.message
+        });
+    }
+});
 
 
 app.post('/api/reviews', async (req, res) => {
@@ -406,6 +438,7 @@ app.post('/api/reviews', async (req, res) => {
         });
     }
 });
+
 app.get('/api/my/reviews', async (req, res) => {
     try {
         const query = {};
@@ -495,8 +528,6 @@ app.get('/api/admin/reports', async (req, res) => {
         })
     }
 });
-
-
 
 
 module.exports = app;

@@ -43,7 +43,45 @@ const reviews = db.collection('reviews');
 const bookmarks = db.collection('bookmarks');
 const payments = db.collection('payments');
 const reports = db.collection('reports');
-const users = db.collection('users');
+const users = db.collection('user');
+const sessions = db.collection('session');
+
+
+const verifyToken = async (req, res, next) => {
+    console.log('header.........', req.headers);
+    const header = req.headers.authorization
+    if (!header) {
+        return res.status(401).send({
+            message: "Unauthorize acsess"
+        })
+    }
+
+    const token = header.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).send({
+            message: "Unauthorize acsess"
+        })
+    }
+
+    const query = { token: token }
+    const session = await sessions.findOne(query);
+
+    console.log("session of sessssssss----", session);
+    const userId = session?.userId;
+
+    const userQuary = {
+        _id: userId
+    }
+    const user = await users.findOne(userQuary);
+
+    console.log("user of sessssssss----", user);
+
+
+    req.user = user;
+
+    next();
+}
 
 
 
@@ -100,7 +138,7 @@ app.get('/api/prompts', async (req, res) => {
     }
 });
 
-app.get('/api/prompts/:id', async (req, res) => {
+app.get('/api/prompts/:id', verifyToken, async (req, res) => {
     try {
 
         const { id } = req.params;
@@ -117,7 +155,7 @@ app.get('/api/prompts/:id', async (req, res) => {
         }
 
         // Public Prompt
-        if (prompt.visibility === 'free') {
+        if (prompt?.visibility === 'free') {
             return res.status(200).send({
                 success: true,
                 message: 'Prompt fetched successfully',
@@ -129,6 +167,9 @@ app.get('/api/prompts/:id', async (req, res) => {
         const user = await users.findOne({
             email: req.user.email
         });
+
+        console.log(prompt);
+        console.log(user);
 
         // Premium User 
         if (user?.plan === 'premium') {
@@ -163,6 +204,52 @@ app.get('/api/prompts/:id', async (req, res) => {
     }
 });
 
+
+
+// app.get('/api/prompts/:id', verifyToken, async (req, res) => {
+//     try {
+
+//         const { id } = req.params;
+
+//         const prompt = await prompts.findOne({
+//             _id: new ObjectId(id)
+//         });
+
+//         if (!prompt) {
+//             return res.status(404).send({
+//                 success: false,
+//                 message: 'Prompt not found'
+//             });
+//         }
+
+//         if (prompt.visibility === 'free') {
+//             return res.status(200).send({
+//                 success: true,
+//                 data: prompt
+//             });
+//         }
+
+//         return res.status(200).send({
+//             success: true,
+//             data: {
+//                 ...prompt,
+//                 content: null,
+//                 locked: true
+//             }
+//         });
+
+//     } catch (error) {
+
+//         console.log(error);
+
+//         res.status(500).send({
+//             success: false,
+//             message: 'Failed to get prompt',
+//             error: error.message
+//         });
+
+//     }
+// });
 
 app.get('/api/my/prompts', async (req, res) => {
     try {
@@ -272,6 +359,9 @@ app.patch('/api/prompts/:id', async (req, res) => {
 });
 
 
+
+
+
 // bookmark related api
 // app.post('/api/bookmarks', async (req, res) => {
 //     try {
@@ -336,7 +426,7 @@ app.post('/api/bookmarks', async (req, res) => {
     }
 });
 
-app.get('/api/my/bookmarks', async (req, res) => {
+app.get('/api/my/bookmarks', verifyToken, async (req, res) => {
     try {
         const query = {};
         if (req.query.userId) {

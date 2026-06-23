@@ -8,6 +8,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 // Load environment variables
 dotenv.config();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const PORT = process.env.PORT || 4000;
 const uri = process.env.MONGODB_URI;
@@ -45,10 +46,10 @@ const payments = db.collection('payments');
 const reports = db.collection('reports');
 const users = db.collection('user');
 const sessions = db.collection('session');
+const subscriptions = db.collection('subscriptions');
 
 
 const verifyToken = async (req, res, next) => {
-    console.log('header.........', req.headers);
     const header = req.headers.authorization
     if (!header) {
         return res.status(401).send({
@@ -67,7 +68,7 @@ const verifyToken = async (req, res, next) => {
     const query = { token: token }
     const session = await sessions.findOne(query);
 
-    console.log("session of sessssssss----", session);
+  
     const userId = session?.userId;
 
     const userQuary = {
@@ -75,7 +76,7 @@ const verifyToken = async (req, res, next) => {
     }
     const user = await users.findOne(userQuary);
 
-    console.log("user of sessssssss----", user);
+   
 
 
     req.user = user;
@@ -618,6 +619,141 @@ app.get('/api/admin/reports', async (req, res) => {
         })
     }
 });
+
+
+// stripe pamyent related api
+// app.get('/api/admin/payments', async (req, res) => {
+//     try {
+//         // সিকিউরিটি চেক: রিকোয়েস্টকারী ইউজার অ্যাডমিন কিনা তা নিশ্চিত করার লজিক (প্রয়োজন হলে অন করতে পারেন)
+//         // if (req.user?.role !== 'admin') {
+//         //     return res.status(403).send({ success: false, message: 'Forbidden access' });
+//         // }
+
+//         // Stripe থেকে সর্বশেষ ২০টি ট্রানজেকশন নিয়ে আসা
+//         const paymentIntents = await stripe.paymentIntents.list({
+//             limit: 20,
+//         });
+
+//         // ফিল্টার লজিক: বিশাল ডেটা থেকে শুধু প্রয়োজনীয় ফিল্ডগুলো বেছে নেওয়া হচ্ছে
+//         const cleanPayments = paymentIntents.data.map(payment => {
+//             // যদি presentment_details-এ bdt অ্যামাউন্ট থাকে তবে সেটা নেওয়া হবে, না হলে মূল usd অ্যামাউন্ট নেওয়া হবে
+//             const hasBdt = payment.presentment_details && payment.presentment_details.presentment_currency === 'bdt';
+//             const finalAmount = hasBdt
+//                 ? payment.presentment_details.presentment_amount / 100
+//                 : payment.amount_received / 100;
+
+//             const finalCurrency = hasBdt ? 'bdt' : payment.currency;
+
+//             return {
+//                 id: payment.id,
+//                 amount: finalAmount,
+//                 currency: finalCurrency.toUpperCase(), // USD বা BDT ক্যাপিটাল লেটারে দেখাবে
+//                 status: payment.status, // e.g., 'succeeded'
+//                 date: new Date(payment.created * 1000).toISOString().split('T')[0], // YYYY-MM-DD ফরম্যাট
+//                 email: payment.receipt_email || 'N/A', // যদি ইমেইল থাকে, না থাকলে N/A
+//                 description: payment.description || 'Subscription creation',
+//                 customer: payment.customer
+//             };
+//         });
+
+//         res.status(200).send({
+//             success: true,
+//             message: 'Stripe payments fetched and filtered successfully',
+//             data: cleanPayments // এখন ফ্রন্টেন্ডে শুধু এই লাইটওয়েট এবং গোছানো ডেটা যাবে
+//         });
+//     } catch (error) {
+//         console.log(error);
+//         res.status(500).send({
+//             success: false,
+//             message: 'Failed to fetch Stripe payments',
+//             error: error.message
+//         });
+//     }
+// });
+
+subscriptions
+app.post('/api/subscriptions', async (req, res) => {
+    try {
+        const subscription = req.body;
+        console.log("planId:,,", subscription.planId);
+
+        const subsInfo = {
+            ...subscription,
+            createdAt: new Date(),
+        }
+
+        const subscriptionResult = await subscriptions.insertOne(subsInfo);
+
+        const updateDocument = {
+            $set: {
+                plan: subscription.planId, // আপনার রিকোয়েস্ট বডিতে planId থাকতে হবে
+            },
+        };
+
+        const filter = { email: subscription.email };
+        console.log("email....", subscription.email);
+        const userResult = await users.updateOne(filter, updateDocument);
+
+
+
+        res.status(200).send({
+            success: true,
+            message: 'Subscription created and user plan updated successfully',
+            subscriptionData: subscriptionResult,
+            userData: userResult
+        });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Failed to complete subscription process',
+            error: error.message
+        });
+    }
+});
+
+
+// app.post('/api/subscriptions', async (req, res) => {
+//     try {
+//         const data = req.body; // এখন এই 'data' পুরো try ব্লকের যেকোনো জায়গায় ব্যবহার করা যাবে
+
+//         // ১. সাবস্ক্রিপশন ডাটা তৈরি এবং ডাটাবেজে ইনসার্ট
+//         const subInfo = {
+//             ...data,
+//             createdAt: new Date()
+//         };
+//         const subscriptionResult = await subscriptions.insertOne(subInfo);
+
+//         // ২. ইউজারের প্ল্যান আপডেট করা
+//         const filter = { email: data.email };
+//         const updateDocument = {
+//             $set: {
+//                 plan: data.planId, // আপনার রিকোয়েস্ট বডিতে planId থাকতে হবে
+//             },
+//         };
+
+//         const userResult = await users.updateOne(filter, updateDocument);
+
+//         // ৩. সব কাজ সফলভাবে শেষ হলে একটিমাত্র রেসপন্স পাঠানো হবে
+//         res.status(200).send({
+//             success: true,
+//             message: 'Subscription created and user plan updated successfully',
+//             subscriptionData: subscriptionResult,
+//             userData: userResult
+//         });
+
+//     } catch (error) {
+//         // যেকোনো একটি অপারেশনে ভুল হলে বা এরর আসলে সরাসরি এখানে চলে আসবে
+//         console.error("Error in subscription process:", error);
+//         res.status(500).send({
+//             success: false,
+//             message: 'Failed to complete subscription process',
+//             error: error.message
+//         });
+//     }
+// });
+
 
 
 module.exports = app;

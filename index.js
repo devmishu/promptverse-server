@@ -465,6 +465,104 @@ app.get('/api/prompts', async (req, res) => {
     }
 });
 
+app.get('/api/featured/prompts', async (req, res) => {
+    try {
+        // ১. শুধুমাত্রapproved প্রম্পটগুলো ফিল্টার করার কোয়েরি
+        let query = {
+            status: 'approved'
+        };
+
+        // ২. ফিচারড প্রম্পটের জন্য ডিফল্ট সর্টিং (সবচেয়ে বেশি কপি হওয়া প্রম্পট আগে আসবে)
+        let sortOption = { copyCount: -1 };
+
+        const result = await prompts.aggregate([
+            {
+                // শুধু অ্যাপ্রুভড ডাটা ম্যাচ করবে
+                $match: query
+            },
+
+            {
+                // রিভিও কালেকশন থেকে ডাটা লুকআপ
+                $lookup: {
+                    from: "reviews",
+                    let: {
+                        promptId: { $toString: "$_id" }
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$promptId", "$$promptId"]
+                                }
+                            }
+                        }
+                    ],
+                    as: "reviews"
+                }
+            },
+
+            {
+                // রিভিউ কাউন্ট এবং অ্যাভারেজ রেটিং ক্যালকুলেশন
+                $addFields: {
+                    reviewCount: {
+                        $size: "$reviews"
+                    },
+                    averageRating: {
+                        $cond: [
+                            { $gt: [{ $size: "$reviews" }, 0] },
+                            { $avg: "$reviews.rating" },
+                            0
+                        ]
+                    }
+                }
+            },
+
+            {
+                // আপনার প্রোভাইড করা হুবহু সেম ডাটা প্রজেকশন
+                $project: {
+                    title: 1,
+                    description: 1,
+                    thumbnail: 1,
+                    category: 1,
+                    aiTool: 1,
+                    difficulty: 1,
+                    visibility: 1,
+                    copyCount: 1,
+                    createdAt: 1,
+                    status: 1,
+
+                    reviewCount: 1,
+                    averageRating: 1
+                }
+            },
+
+            {
+                // পপুলারিটি অনুযায়ী সর্ট করা
+                $sort: sortOption
+            },
+
+            {
+                // 🌟 রিকোয়ারমেন্ট অনুযায়ী শুধুমাত্র প্রথম ৬টি ডাটা লিমিট করা হলো
+                $limit: 6
+            }
+        ]).toArray();
+
+        res.status(200).send({
+            success: true,
+            count: result.length,
+            data: result
+        });
+
+    } catch (error) {
+        console.error("GET /api/featured-prompts Error:", error);
+
+        res.status(500).send({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 
 app.get('/api/prompts/:id', verifyToken, async (req, res) => {
     try {
@@ -567,6 +665,7 @@ app.get('/api/my/prompts', async (req, res) => {
     }
 });
 
+
 app.get('/api/admin/prompts', async (req, res) => {
     try {
 
@@ -586,6 +685,8 @@ app.get('/api/admin/prompts', async (req, res) => {
         })
     }
 });
+
+
 
 app.delete('/api/prompt/:id', async (req, res) => {
 
@@ -649,6 +750,27 @@ app.patch('/api/prompts/:id', async (req, res) => {
     }
 });
 
+// প্রম্পটের কপি কাউন্ট ডাটাবেজে ১ বাড়ানোর PATCH API
+app.patch('/api/prompts/:id/copy', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // মঙ্গোডিবি-র $inc অপারেটর ব্যবহার করে copyCount ১ বাড়ানো হচ্ছে
+        const result = await prompts.updateOne(
+            { _id: new ObjectId(id) },
+            { $inc: { copyCount: 1 } }
+        );
+
+        if (result.modifiedCount > 0) {
+            res.send({ success: true, message: "Copy count updated in database!" });
+        } else {
+            res.status(404).send({ success: false, message: "Prompt not found" });
+        }
+    } catch (error) {
+        res.status(500).send({ success: false, error: error.message });
+    }
+});
+
 
 
 
@@ -689,7 +811,7 @@ app.post('/api/bookmarks', async (req, res) => {
         }
 
         // ২. ডাটাবেজে চেক করা হচ্ছে এই ইউজার এই প্রম্পট অলরেডি বুকমার্ক করেছে কিনা
-        const existingBookmark = await bookmarks.findOne({ userId: userId, _id: promptId });
+        const existingBookmark = await bookmarks.findOne({ userId: userId, promptId: promptId });
 
         if (existingBookmark) {
             return res.status(400).send({
@@ -716,6 +838,41 @@ app.post('/api/bookmarks', async (req, res) => {
         });
     }
 });
+
+app.get('/api/bookmarks/check', async (req, res) => {
+    const { userId, promptId } = req.query;
+    const existing = await bookmarks.findOne({ userId, promptId });
+    res.send({ isBookmarked: !!existing });
+});
+
+
+// ১. ইউজার এই প্রম্পটে অলরেডি রিভিউ দিয়েছে কিনা চেক করার এপিআই
+app.get('/api/reviews/check', async (req, res) => {
+    try {
+        const { userId, promptId } = req.query;
+        // আপনার কালেকশনের নাম অনুযায়ী পরিবর্তন করে নিবেন (যেমন: reviews)
+        const existing = await reviews.findOne({ userId, promptId });
+        res.send({ hasReviewed: !!existing });
+    } catch (error) {
+        res.status(500).send({ hasReviewed: false });
+    }
+});
+
+// ২. ইউজার এই প্রম্পটে অলরেডি রিপোর্ট করেছে কিনা চেক করার এপিআই
+app.get('/api/reports/check', async (req, res) => {
+    try {
+        const { userId, promptId } = req.query;
+        // আপনার কালেকশনের নাম অনুযায়ী পরিবর্তন করে নিবেন (যেমন: reports)
+        const existing = await reports.findOne({ userId, promptId });
+        res.send({ hasReported: !!existing });
+    } catch (error) {
+        res.status(500).send({ hasReported: false });
+    }
+});
+
+
+
+
 
 app.get('/api/my/bookmarks', verifyToken, async (req, res) => {
     try {
@@ -976,7 +1133,83 @@ app.delete('/api/admin/reports/:id', async (req, res) => {
     }
 });
 
+// creator related api
+app.get('/api/top-creators', async (req, res) => {
+    try {
+        const result = await prompts.aggregate([
+            // ১. প্রম্পটের স্ট্যাটাস যদি শুধু 'approved' গুলো গুনতে চান (ঐচ্ছিক)
+            { $match: { status: "approved" } },
 
+            // ২. userId অনুযায়ী গ্রুপ করে প্রয়োজনীয় ডাটা এগ্রিগেট করা হচ্ছে
+            {
+                $group: {
+                    _id: "$userId",
+                    totalPromptsCreated: { $sum: 1 }, // মোট কয়টি প্রম্পট তৈরি করেছে
+                    totalCopies: { $sum: "$copyCount" }, // সব প্রম্পট মিলিয়ে মোট কতবার কপি হয়েছে
+
+                    // ইউজার কোন এআই টুল সবচেয়ে বেশি ব্যবহার করে তা ট্র্যাক করার জন্য পুশ করা হচ্ছে
+                    aiToolsUsed: { $push: "$aiTool" },
+
+                    // ইউজার কোন ক্যাটাগরিতে বেশি প্রম্পট বানায় তা জানার জন্য পুশ করা হচ্ছে
+                    categoriesUsed: { $push: "$category" }
+                }
+            },
+
+            // ৩. সর্বোচ্চ প্রম্পট সংখ্যার ওপর ভিত্তি করে বড় থেকে ছোট (Descending) সাজানো
+            { $sort: { totalPromptsCreated: -1 } },
+
+            // ৪. টপ ১০ ক্রিয়েটর লিমিট
+            { $limit: 10 },
+
+            // ৫. ইউজার কালেকশন থেকে ক্রিয়েটরের প্রোফাইল ডিটেইলস নিয়ে আসা
+            {
+                $lookup: {
+                    from: "users", // আপনার ইউজার কালেকশনের নাম
+                    let: { creatorId: "$_id" },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: { $eq: ["$_id", { $toObjectId: "$$creatorId" }] }
+                                // নোট: ইউজার কালেকশনের _id যদি স্ট্রিং হয়, তবে নিচেরটি ব্যবহার করবেন:
+                                // $expr: { $eq: ["$_id", "$$creatorId"] }
+                            }
+                        }
+                    ],
+                    as: "userDetails"
+                }
+            },
+
+            // ৬. lookup অ্যারে-কে অবজেক্টে রূপান্তর
+            { $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } },
+
+            // ৭. ফ্রন্টএন্ড কার্ডের জন্য ডাটা প্রজেকশন এবং ফরম্যাটিং
+            {
+                $project: {
+                    _id: 0,
+                    userId: "$_id",
+                    totalPromptsCreated: 1,
+                    totalCopies: 1,
+                    name: "$userDetails.name",
+                    email: "$userDetails.email",
+                    avatarUrl: "$userDetails.avatarUrl", // আপনার ডাটাবেজের ফিল্ড নেম দিন
+
+                    // 🌟 এক্সট্রা ফিচার: ইউজার সবথেকে বেশি কোন এআই টুলটি ব্যবহার করে (যেমন: "ChatGPT" বা "Midjourney")
+                    topAiTool: {
+                        $arrayElemAt: ["$aiToolsUsed", 0]
+                    },
+                    // 🌟 এক্সট্রা ফিচার: ইউজারের মেইন ক্যাটাগরি (যেমন: "development")
+                    mainCategory: {
+                        $arrayElemAt: ["$categoriesUsed", 0]
+                    }
+                }
+            }
+        ]).toArray();
+
+        res.send({ success: true, data: result });
+    } catch (error) {
+        res.status(500).send({ success: false, error: error.message });
+    }
+});
 
 
 

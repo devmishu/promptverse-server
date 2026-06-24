@@ -138,71 +138,71 @@ app.get('/api/prompts', async (req, res) => {
     }
 });
 
-app.get('/api/prompts/:id', verifyToken, async (req, res) => {
-    try {
+// app.get('/api/prompts/:id', verifyToken, async (req, res) => {
+//     try {
 
-        const { id } = req.params;
+//         const { id } = req.params;
 
-        const prompt = await prompts.findOne({
-            _id: new ObjectId(id)
-        });
+//         const prompt = await prompts.findOne({
+//             _id: new ObjectId(id)
+//         });
 
-        if (!prompt) {
-            return res.status(404).send({
-                success: false,
-                message: 'Prompt not found'
-            });
-        }
+//         if (!prompt) {
+//             return res.status(404).send({
+//                 success: false,
+//                 message: 'Prompt not found'
+//             });
+//         }
 
-        // Public Prompt
-        if (prompt?.visibility === 'free') {
-            return res.status(200).send({
-                success: true,
-                message: 'Prompt fetched successfully',
-                data: prompt
-            });
-        }
+//         // Public Prompt
+//         if (prompt?.visibility === 'free') {
+//             return res.status(200).send({
+//                 success: true,
+//                 message: 'Prompt fetched successfully',
+//                 data: prompt
+//             });
+//         }
 
-        // Logged in User
-        const user = await users.findOne({
-            email: req.user.email
-        });
+//         // Logged in User
+//         const user = await users.findOne({
+//             email: req.user.email
+//         });
 
-        console.log(prompt);
-        console.log(user);
+//         console.log(prompt);
+//         console.log(user);
 
-        // Premium User 
-        if (user?.plan === 'premium') {
-            return res.status(200).send({
-                success: true,
-                message: 'Prompt fetched successfully',
-                data: prompt
-            });
-        }
+//         // Premium User 
+//         if (user?.plan === 'premium') {
+//             return res.status(200).send({
+//                 success: true,
+//                 message: 'Prompt fetched successfully',
+//                 data: prompt
+//             });
+//         }
 
-        // Free User + Private Prompt
-        return res.status(200).send({
-            success: true,
-            message: 'Premium prompt locked',
-            data: {
-                ...prompt,
-                content: null,
-                locked: true
-            }
-        });
+//         // Free User + Private Prompt
+//         return res.status(200).send({
+//             success: true,
+//             message: 'Premium prompt locked',
+//             data: {
+//                 ...prompt,
+//                 content: null,
+//                 locked: true
+//             }
+//         });
 
-    } catch (error) {
+//     } catch (error) {
 
-        console.log(error);
+//         console.log(error);
 
-        res.status(500).send({
-            success: false,
-            message: 'Failed to get prompt',
-            error: error.message
-        });
+//         res.status(500).send({
+//             success: false,
+//             message: 'Failed to get prompt',
+//             error: error.message
+//         });
 
-    }
-});
+//     }
+// });
 
 
 
@@ -250,6 +250,82 @@ app.get('/api/prompts/:id', verifyToken, async (req, res) => {
 
 //     }
 // });
+
+app.get('/api/prompts/:id', verifyToken, async (req, res) => {
+    try {
+
+        const { id } = req.params;
+
+        const prompt = await prompts.findOne({
+            _id: new ObjectId(id)
+        });
+
+        if (!prompt) {
+            return res.status(404).send({
+                success: false,
+                message: 'Prompt not found'
+            });
+        }
+
+        // Logged in User
+        const user = await users.findOne({
+            email: req.user.email
+        });
+
+        console.log(prompt);
+        console.log(user);
+
+        // 🎯 Admin Access: এডমিন হলে যেকোনো প্রম্পটে ফুল অ্যাক্সেস পাবে (কোনো প্ল্যান লাগবে না)
+        if (user?.role === 'admin') {
+            return res.status(200).send({
+                success: true,
+                message: 'Prompt fetched successfully by admin',
+                data: prompt
+            });
+        }
+
+        // Public Prompt
+        if (prompt?.visibility === 'free') {
+            return res.status(200).send({
+                success: true,
+                message: 'Prompt fetched successfully',
+                data: prompt
+            });
+        }
+
+        // Premium User 
+        if (user?.plan === 'premium') {
+            return res.status(200).send({
+                success: true,
+                message: 'Prompt fetched successfully',
+                data: prompt
+            });
+        }
+
+        // Free User + Private Prompt
+        return res.status(200).send({
+            success: true,
+            message: 'Premium prompt locked',
+            data: {
+                ...prompt,
+                content: null,
+                locked: true
+            }
+        });
+
+    } catch (error) {
+
+        console.log(error);
+
+        res.status(500).send({
+            success: false,
+            message: 'Failed to get prompt',
+            error: error.message
+        });
+
+    }
+});
+
 
 app.get('/api/my/prompts', async (req, res) => {
     try {
@@ -510,8 +586,12 @@ app.post('/api/reviews', async (req, res) => {
             });
         }
 
+        const reviewInfo = {
+            ...review,
+            createdAt: new Date().toLocaleString(),
+        }
         // ৩. অলরেডি রিভিউ না থাকলে নতুন রিভিউ ডাটাবেজে সেভ হবে
-        const result = await reviews.insertOne(review);
+        const result = await reviews.insertOne(reviewInfo);
 
         res.status(200).send({
             success: true,
@@ -577,7 +657,7 @@ app.get('/api/prompt/reviews', async (req, res) => {
             error: error.message
         })
     }
-}); 
+});
 
 
 
@@ -646,6 +726,38 @@ app.get('/api/admin/reports', async (req, res) => {
             message: 'Failed get  all reports ',
             error: error.message
         })
+    }
+});
+
+app.delete('/api/admin/reports/:id', async (req, res) => {
+
+    const { id } = req.params;
+
+    console.log(id);
+
+    const query = {
+        _id: new ObjectId(id)
+    }
+
+    try {
+
+        const deleteReport = await reports.deleteOne(query);
+
+
+        res.status(200).send({
+            success: true,
+            message: 'Delete reports successfully',
+            data: deleteReport
+        });
+
+    } catch (error) {
+
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Delete reports failed',
+            error: error.message
+        });
     }
 });
 
@@ -767,3 +879,12 @@ app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
 
+
+/**
+ * tumi amr ay website them collor use kore amr jonno akta profile components banaw :
+ * content: 
+ * top: profile photo,email, name, plan jodi premium hoy premium badge,  role badge, arekta plan badge lifitime, 
+ * midle: 2 ta card takbe aktate Prompts Published length,icon and areck ta card acount varification status, 
+ * last: user ar plan jodi free take tahole plan upgrade korar jonno detail page je upgrade card ta use korecile ota same to same use korbe ar jodi plan premium take tahple akta right mark icon and akta message leka takbe lifitim premium........................
+ * using hero ui (version 3.0.1) data gula sob props akare jabe
+ */

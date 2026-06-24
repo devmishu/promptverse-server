@@ -108,35 +108,35 @@ app.post('/api/prompts', async (req, res) => {
     }
 });
 
-app.get('/api/prompts', async (req, res) => {
-    try {
+// app.get('/api/prompts', async (req, res) => {
+//     try {
 
-        const result = await prompts
-            .find({})
-            .project({
-                title: 1,
-                description: 1,
-                thumbnail: 1,
-                category: 1,
-                aiTool: 1,
-                difficulty: 1,
-                visibility: 1,
-                copyCount: 1
-            })
-            .toArray();
+//         const result = await prompts
+//             .find({})
+//             .project({
+//                 title: 1,
+//                 description: 1,
+//                 thumbnail: 1,
+//                 category: 1,
+//                 aiTool: 1,
+//                 difficulty: 1,
+//                 visibility: 1,
+//                 copyCount: 1
+//             })
+//             .toArray();
 
-        res.status(200).send({
-            success: true,
-            data: result
-        });
+//         res.status(200).send({
+//             success: true,
+//             data: result
+//         });
 
-    } catch (error) {
-        res.status(500).send({
-            success: false,
-            error: error.message
-        });
-    }
-});
+//     } catch (error) {
+//         res.status(500).send({
+//             success: false,
+//             error: error.message
+//         });
+//     }
+// });
 
 // app.get('/api/prompts/:id', verifyToken, async (req, res) => {
 //     try {
@@ -250,6 +250,221 @@ app.get('/api/prompts', async (req, res) => {
 
 //     }
 // });
+
+// app.get('/api/prompts', async (req, res) => {
+//     try {
+//         const { search, sort, aiTool, category, difficulty } = req.query;
+
+//         // 🔒 ডিফল্ট কুয়েরিতেই শুধুমাত্র 'approved' প্রম্পট সেট করে দেওয়া হলো 
+//         // (এর ফলে পেন্ডিং বা রিজেক্টেড কোনো প্রম্পট ইউজার দেখতে পাবে না)
+//         let query = { status: 'approved' };
+
+//         console.log("backend category......", category);
+//         console.log("backend aiTool......", aiTool);
+//         // 🛡️ Regex Injection Protection
+//         // const escapeRegex = (text) => text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+
+
+
+//         if (search) {
+//             query.$or = [
+//                 { title: { $regex: req.query.search, $options: 'i' } },
+//                 { description: { $regex: req.query.search, $options: 'i' } },
+//                 { aiTool: { $regex: req.query.search, $options: 'i' } },]
+//         }
+
+//         // 🛠 ফিল্টার কন্ডিশনস
+//         // if (aiTool) query.aiTool = { $regex: new RegExp(`^${escapeRegex(aiTool.trim())}$`, 'i') };
+//         // if (category) query.category = { $regex: new RegExp(`^${escapeRegex(category.trim())}$`, 'i') };
+//         // if (difficulty) query.difficulty = { $regex: new RegExp(`^${escapeRegex(difficulty.trim())}$`, 'i') };
+
+
+//         // ১. সাধারণ ফিল্টারসমূহ
+//         if (req.query.aiTool) {
+//             query.aiTool = req.query.aiTool;
+//         }
+//         if (category) {
+//             query.category = req.query.category;
+//         }
+//         if (difficulty) {
+//             query.difficulty = req.query.difficulty;
+//         }
+
+//         // 🔢 সর্টিং লজিক
+//         let sortOption = {};
+//         if (sort === 'most-copied' || sort === 'most-popular') {
+//             sortOption.copyCount = -1; // বেশি কপি হওয়া প্রম্পট আগে আসবে
+//         } else if (sort === 'latest') {
+//             sortOption.createdAt = -1; // নতুন প্রম্পট আগে আসবে
+//         } else {
+//             sortOption._id = -1; // ডিফল্ট সর্ট
+//         }
+
+
+
+//         const result = await prompts
+//             .find(query)
+//             .sort(sortOption)
+//             .project({
+//                 title: 1,
+//                 description: 1,
+//                 thumbnail: 1,
+//                 category: 1,
+//                 aiTool: 1,
+//                 difficulty: 1,
+//                 visibility: 1,
+//                 copyCount: 1,
+//                 createdAt: 1,
+//                 status: 1 // স্ট্যাটাস ফিল্ডটি রেসপন্সে রাখার জন্য প্রজেক্ট করা হলো
+//             })
+//             .toArray();
+
+//         res.status(200).send({
+//             success: true,
+//             count: result.length,
+//             data: result
+//         });
+
+//     } catch (error) {
+//         res.status(500).send({
+//             success: false,
+//             error: error.message
+//         });
+//     }
+// });
+
+
+app.get('/api/prompts', async (req, res) => {
+    try {
+
+        const { search, sort, aiTool, category, difficulty } = req.query;
+
+        console.log("aiTool..........", aiTool);
+
+        // Only approved prompts
+        let query = {
+            status: 'approved'
+        };
+
+        // Search
+        if (search) {
+            query.$or = [
+                { title: { $regex: search, $options: 'i' } },
+                { description: { $regex: search, $options: 'i' } },
+                { aiTool: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        // Filters
+        if (aiTool) {
+            query.aiTool = {
+                $regex: `^${aiTool.trim()}$`,
+                $options: "i"
+            };
+        }
+
+        if (category) {
+            query.category = {
+                $regex: `^${category.trim()}$`,
+                $options: "i"
+            };
+        }
+
+        if (difficulty) {
+            query.difficulty = {
+                $regex: `^${difficulty.trim()}$`,
+                $options: "i"
+            };
+        }
+
+        // Sorting
+        let sortOption = { _id: -1 };
+
+        if (sort === 'most-copied' || sort === 'most-popular') {
+            sortOption = { copyCount: -1 };
+        } else if (sort === 'latest') {
+            sortOption = { createdAt: -1 };
+        }
+
+        const result = await prompts.aggregate([
+            {
+                $match: query
+            },
+
+            {
+                $lookup: {
+                    from: "reviews",
+                    let: {
+                        promptId: { $toString: "$_id" }
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$promptId", "$$promptId"]
+                                }
+                            }
+                        }
+                    ],
+                    as: "reviews"
+                }
+            },
+
+            {
+                $addFields: {
+                    reviewCount: {
+                        $size: "$reviews"
+                    },
+                    averageRating: {
+                        $cond: [
+                            { $gt: [{ $size: "$reviews" }, 0] },
+                            { $avg: "$reviews.rating" },
+                            0
+                        ]
+                    }
+                }
+            },
+
+            {
+                $project: {
+                    title: 1,
+                    description: 1,
+                    thumbnail: 1,
+                    category: 1,
+                    aiTool: 1,
+                    difficulty: 1,
+                    visibility: 1,
+                    copyCount: 1,
+                    createdAt: 1,
+                    status: 1,
+
+                    reviewCount: 1,
+                    averageRating: 1
+                }
+            },
+
+            {
+                $sort: sortOption
+            }
+        ]).toArray();
+
+        res.status(200).send({
+            success: true,
+            count: result.length,
+            data: result
+        });
+
+    } catch (error) {
+
+        console.error("GET /api/prompts Error:", error);
+
+        res.status(500).send({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 
 app.get('/api/prompts/:id', verifyToken, async (req, res) => {
     try {

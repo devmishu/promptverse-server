@@ -91,7 +91,12 @@ const verifyToken = async (req, res, next) => {
 app.post('/api/prompts', async (req, res) => {
     try {
         const prompt = req.body;
-        const result = await prompts.insertOne(prompt);
+
+        const promptInfo = {
+            ...prompt,
+            createdAt: new Date(),
+        }
+        const result = await prompts.insertOne(promptInfo);
 
         res.status(200).send({
             success: true,
@@ -334,14 +339,153 @@ app.post('/api/prompts', async (req, res) => {
 // });
 
 
+// app.get('/api/prompts', async (req, res) => {
+//     try {
+
+//         const { search, sort, aiTool, category, difficulty } = req.query;
+
+//         console.log("aiTool..........", aiTool);
+
+//         // Only approved prompts
+//         let query = {
+//             status: 'approved'
+//         };
+
+//         // Search
+//         if (search) {
+//             query.$or = [
+//                 { title: { $regex: search, $options: 'i' } },
+//                 { description: { $regex: search, $options: 'i' } },
+//                 { aiTool: { $regex: search, $options: 'i' } }
+//             ];
+//         }
+
+//         // Filters
+//         if (aiTool) {
+//             query.aiTool = {
+//                 $regex: `^${aiTool.trim()}$`,
+//                 $options: "i"
+//             };
+//         }
+
+//         if (category) {
+//             query.category = {
+//                 $regex: `^${category.trim()}$`,
+//                 $options: "i"
+//             };
+//         }
+
+//         if (difficulty) {
+//             query.difficulty = {
+//                 $regex: `^${difficulty.trim()}$`,
+//                 $options: "i"
+//             };
+//         }
+
+//         // Sorting
+//         let sortOption = { _id: -1 };
+
+//         if (sort === 'most-copied' || sort === 'most-popular') {
+//             sortOption = { copyCount: -1 };
+//         } else if (sort === 'latest') {
+//             sortOption = { createdAt: -1 };
+//         }
+
+//         const result = await prompts.aggregate([
+//             {
+//                 $match: query
+//             },
+
+//             {
+//                 $lookup: {
+//                     from: "reviews",
+//                     let: {
+//                         promptId: { $toString: "$_id" }
+//                     },
+//                     pipeline: [
+//                         {
+//                             $match: {
+//                                 $expr: {
+//                                     $eq: ["$promptId", "$$promptId"]
+//                                 }
+//                             }
+//                         }
+//                     ],
+//                     as: "reviews"
+//                 }
+//             },
+
+//             {
+//                 $addFields: {
+//                     reviewCount: {
+//                         $size: "$reviews"
+//                     },
+//                     averageRating: {
+//                         $cond: [
+//                             { $gt: [{ $size: "$reviews" }, 0] },
+//                             { $avg: "$reviews.rating" },
+//                             0
+//                         ]
+//                     }
+//                 }
+//             },
+
+//             {
+//                 $project: {
+//                     title: 1,
+//                     description: 1,
+//                     thumbnail: 1,
+//                     category: 1,
+//                     aiTool: 1,
+//                     difficulty: 1,
+//                     visibility: 1,
+//                     copyCount: 1,
+//                     createdAt: 1,
+//                     status: 1,
+
+//                     reviewCount: 1,
+//                     averageRating: 1,
+
+//                 }
+//             },
+
+//             {
+//                 $sort: sortOption
+//             }
+//         ]).toArray();
+
+//         res.status(200).send({
+//             success: true,
+//             count: result.length,
+//             data: result
+//         });
+
+//     } catch (error) {
+
+//         console.error("GET /api/prompts Error:", error);
+
+//         res.status(500).send({
+//             success: false,
+//             error: error.message
+//         });
+//     }
+// });
+
+
+
 app.get('/api/prompts', async (req, res) => {
     try {
 
-        const { search, sort, aiTool, category, difficulty } = req.query;
+        const {
+            search,
+            sort,
+            aiTool,
+            category,
+            difficulty,
+            page,
+            itemsPerPage
+        } = req.query;
 
-        console.log("aiTool..........", aiTool);
-
-        // Only approved prompts
         let query = {
             status: 'approved'
         };
@@ -359,21 +503,21 @@ app.get('/api/prompts', async (req, res) => {
         if (aiTool) {
             query.aiTool = {
                 $regex: `^${aiTool.trim()}$`,
-                $options: "i"
+                $options: 'i'
             };
         }
 
         if (category) {
             query.category = {
                 $regex: `^${category.trim()}$`,
-                $options: "i"
+                $options: 'i'
             };
         }
 
         if (difficulty) {
             query.difficulty = {
                 $regex: `^${difficulty.trim()}$`,
-                $options: "i"
+                $options: 'i'
             };
         }
 
@@ -385,6 +529,13 @@ app.get('/api/prompts', async (req, res) => {
         } else if (sort === 'latest') {
             sortOption = { createdAt: -1 };
         }
+
+        // Total count for pagination
+        const total = await prompts.countDocuments(query);
+
+        const currentPage = parseInt(page) || 1;
+        const limit = parseInt(itemsPerPage) || 8;
+        const skip = (currentPage - 1) * limit;
 
         const result = await prompts.aggregate([
             {
@@ -437,21 +588,30 @@ app.get('/api/prompts', async (req, res) => {
                     copyCount: 1,
                     createdAt: 1,
                     status: 1,
-
                     reviewCount: 1,
-                    averageRating: 1
+                    averageRating: 1,
                 }
             },
 
             {
                 $sort: sortOption
+            },
+
+            {
+                $skip: skip
+            },
+
+            {
+                $limit: limit
             }
         ]).toArray();
 
         res.status(200).send({
             success: true,
-            count: result.length,
-            data: result
+            data: {
+                total,
+                result
+            }
         });
 
     } catch (error) {
@@ -462,6 +622,81 @@ app.get('/api/prompts', async (req, res) => {
             success: false,
             error: error.message
         });
+    }
+});
+
+app.get('/api/prompts/:id', verifyToken, async (req, res) => {
+    try {
+
+        const { id } = req.params;
+
+        const prompt = await prompts.findOne({
+            _id: new ObjectId(id)
+        });
+
+        if (!prompt) {
+            return res.status(404).send({
+                success: false,
+                message: 'Prompt not found'
+            });
+        }
+
+        // Logged in User
+        const user = await users.findOne({
+            email: req.user.email
+        });
+
+        console.log(prompt);
+        console.log(user);
+
+        // 🎯 Admin Access: এডমিন হলে যেকোনো প্রম্পটে ফুল অ্যাক্সেস পাবে (কোনো প্ল্যান লাগবে না)
+        if (user?.role === 'admin') {
+            return res.status(200).send({
+                success: true,
+                message: 'Prompt fetched successfully by admin',
+                data: prompt
+            });
+        }
+
+        // Public Prompt
+        if (prompt?.visibility === 'free') {
+            return res.status(200).send({
+                success: true,
+                message: 'Prompt fetched successfully',
+                data: prompt
+            });
+        }
+
+        // Premium User 
+        if (user?.plan === 'premium') {
+            return res.status(200).send({
+                success: true,
+                message: 'Prompt fetched successfully',
+                data: prompt
+            });
+        }
+
+        // Free User + Private Prompt
+        return res.status(200).send({
+            success: true,
+            message: 'Premium prompt locked',
+            data: {
+                ...prompt,
+                content: null,
+                locked: true
+            }
+        });
+
+    } catch (error) {
+
+        console.log(error);
+
+        res.status(500).send({
+            success: false,
+            message: 'Failed to get prompt',
+            error: error.message
+        });
+
     }
 });
 
@@ -563,83 +798,6 @@ app.get('/api/featured/prompts', async (req, res) => {
     }
 });
 
-
-app.get('/api/prompts/:id', verifyToken, async (req, res) => {
-    try {
-
-        const { id } = req.params;
-
-        const prompt = await prompts.findOne({
-            _id: new ObjectId(id)
-        });
-
-        if (!prompt) {
-            return res.status(404).send({
-                success: false,
-                message: 'Prompt not found'
-            });
-        }
-
-        // Logged in User
-        const user = await users.findOne({
-            email: req.user.email
-        });
-
-        console.log(prompt);
-        console.log(user);
-
-        // 🎯 Admin Access: এডমিন হলে যেকোনো প্রম্পটে ফুল অ্যাক্সেস পাবে (কোনো প্ল্যান লাগবে না)
-        if (user?.role === 'admin') {
-            return res.status(200).send({
-                success: true,
-                message: 'Prompt fetched successfully by admin',
-                data: prompt
-            });
-        }
-
-        // Public Prompt
-        if (prompt?.visibility === 'free') {
-            return res.status(200).send({
-                success: true,
-                message: 'Prompt fetched successfully',
-                data: prompt
-            });
-        }
-
-        // Premium User 
-        if (user?.plan === 'premium') {
-            return res.status(200).send({
-                success: true,
-                message: 'Prompt fetched successfully',
-                data: prompt
-            });
-        }
-
-        // Free User + Private Prompt
-        return res.status(200).send({
-            success: true,
-            message: 'Premium prompt locked',
-            data: {
-                ...prompt,
-                content: null,
-                locked: true
-            }
-        });
-
-    } catch (error) {
-
-        console.log(error);
-
-        res.status(500).send({
-            success: false,
-            message: 'Failed to get prompt',
-            error: error.message
-        });
-
-    }
-});
-
-
 app.get('/api/my/prompts', async (req, res) => {
     try {
         const query = {};
@@ -666,27 +824,76 @@ app.get('/api/my/prompts', async (req, res) => {
 });
 
 
+// app.get('/api/admin/prompts', async (req, res) => {
+//     try {
+
+//         const result = await prompts.find().toArray();
+
+//         res.status(200).send({
+//             success: true,
+//             message: 'all prompts get successfully',
+//             data: result
+//         })
+//     } catch (error) {
+//         console.log(error);
+//         res.status(500).send({
+//             success: false,
+//             message: 'Failed get  all prompts ',
+//             error: error.message
+//         })
+//     }
+// });
+
 app.get('/api/admin/prompts', async (req, res) => {
     try {
 
-        const result = await prompts.find().toArray();
+        let result;
+        let total;
+
+        if (req.query.page) {
+
+            const pageNum = parseInt(req.query.page) || 1;
+            const itemsPerPage = parseInt(req.query.itemsPerPage) || 8; 
+            const skipItem = (pageNum - 1) * itemsPerPage;
+
+            total = await prompts.countDocuments();
+
+            const cursor = prompts
+                .find()
+                .skip(skipItem)
+                .limit(itemsPerPage);
+
+            result = await cursor.toArray();
+
+        } else {
+
+            total = await prompts.countDocuments();
+
+            const cursor = prompts.find();
+
+            result = await cursor.toArray();
+        }
 
         res.status(200).send({
             success: true,
             message: 'all prompts get successfully',
-            data: result
-        })
+            data: {
+                total,
+                result
+            }
+        });
+
     } catch (error) {
+
         console.log(error);
+
         res.status(500).send({
             success: false,
-            message: 'Failed get  all prompts ',
+            message: 'Failed get all prompts',
             error: error.message
-        })
+        });
     }
 });
-
-
 
 app.delete('/api/prompt/:id', async (req, res) => {
 
@@ -1276,8 +1483,6 @@ app.get('/api/admin/subscriptions', async (req, res) => {
         })
     }
 });
-
-
 
 
 

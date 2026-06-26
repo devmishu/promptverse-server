@@ -853,7 +853,7 @@ app.get('/api/admin/prompts', async (req, res) => {
         if (req.query.page) {
 
             const pageNum = parseInt(req.query.page) || 1;
-            const itemsPerPage = parseInt(req.query.itemsPerPage) || 8; 
+            const itemsPerPage = parseInt(req.query.itemsPerPage) || 8;
             const skipItem = (pageNum - 1) * itemsPerPage;
 
             total = await prompts.countDocuments();
@@ -1188,6 +1188,28 @@ app.post('/api/reviews', async (req, res) => {
     }
 });
 
+
+
+app.get('/api/reviews', async (req, res) => {
+    try {
+
+        const result = await reviews.find().toArray()
+        
+        res.status(200).send({
+            success: true,
+            message: 'reviews get successfully',
+            data: result
+        })
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Failed get  reviews ',
+            error: error.message
+        })
+    }
+});
+
 app.get('/api/my/reviews', async (req, res) => {
     try {
         const query = {};
@@ -1341,44 +1363,42 @@ app.delete('/api/admin/reports/:id', async (req, res) => {
 });
 
 // creator related api
-app.get('/api/top-creators', async (req, res) => {
+app.get('/api/top/creators', async (req, res) => {
     try {
         const result = await prompts.aggregate([
-            // ১. প্রম্পটের স্ট্যাটাস যদি শুধু 'approved' গুলো গুনতে চান (ঐচ্ছিক)
+            // ১. প্রম্পটের স্ট্যাটাস ফিল্টার
             { $match: { status: "approved" } },
 
-            // ২. userId অনুযায়ী গ্রুপ করে প্রয়োজনীয় ডাটা এগ্রিগেট করা হচ্ছে
+            // ২. userId অনুযায়ী গ্রুপ করা
             {
                 $group: {
                     _id: "$userId",
-                    totalPromptsCreated: { $sum: 1 }, // মোট কয়টি প্রম্পট তৈরি করেছে
-                    totalCopies: { $sum: "$copyCount" }, // সব প্রম্পট মিলিয়ে মোট কতবার কপি হয়েছে
-
-                    // ইউজার কোন এআই টুল সবচেয়ে বেশি ব্যবহার করে তা ট্র্যাক করার জন্য পুশ করা হচ্ছে
-                    aiToolsUsed: { $push: "$aiTool" },
-
-                    // ইউজার কোন ক্যাটাগরিতে বেশি প্রম্পট বানায় তা জানার জন্য পুশ করা হচ্ছে
-                    categoriesUsed: { $push: "$category" }
+                    totalPromptsCreated: { $sum: 1 },
+                    totalCopies: { $sum: "$copyCount" }
                 }
             },
 
-            // ৩. সর্বোচ্চ প্রম্পট সংখ্যার ওপর ভিত্তি করে বড় থেকে ছোট (Descending) সাজানো
+            // ৩. সর্বোচ্চ প্রম্পট সংখ্যার ওপর ভিত্তি করে সর্ট করা
             { $sort: { totalPromptsCreated: -1 } },
 
-            // ৪. টপ ১০ ক্রিয়েটর লিমিট
+            // ৪. টপ ১০ ক্রিয়েটর লিমিট
             { $limit: 10 },
 
-            // ৫. ইউজার কালেকশন থেকে ক্রিয়েটরের প্রোফাইল ডিটেইলস নিয়ে আসা
+            // ৫. ইউজার কালেকশন থেকে ডাটা নিয়ে আসা (কালেকশন নাম ফিক্স করা হয়েছে)
             {
                 $lookup: {
-                    from: "users", // আপনার ইউজার কালেকশনের নাম
+                    from: "user", // 🎯 আপনার ডিক্লেয়ারেশন অনুযায়ী "users" পরিবর্তন করে "user" করা হলো
                     let: { creatorId: "$_id" },
                     pipeline: [
                         {
                             $match: {
-                                $expr: { $eq: ["$_id", { $toObjectId: "$$creatorId" }] }
-                                // নোট: ইউজার কালেকশনের _id যদি স্ট্রিং হয়, তবে নিচেরটি ব্যবহার করবেন:
-                                // $expr: { $eq: ["$_id", "$$creatorId"] }
+                                $expr: {
+                                    $or: [
+                                        { $eq: ["$_id", "$$creatorId"] },
+                                        { $eq: ["$_id", { $toObjectId: "$$creatorId" }] },
+                                        { $eq: [{ $toObjectId: "$_id" }, "$$creatorId"] }
+                                    ]
+                                }
                             }
                         }
                     ],
@@ -1386,28 +1406,19 @@ app.get('/api/top-creators', async (req, res) => {
                 }
             },
 
-            // ৬. lookup অ্যারে-কে অবজেক্টে রূপান্তর
+            // ६. lookup অ্যারে-কে অবজেক্টে রূপান্তর
             { $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } },
 
-            // ৭. ফ্রন্টএন্ড কার্ডের জন্য ডাটা প্রজেকশন এবং ফরম্যাটিং
+            // ৭. ফাইনাল আউটপুট প্রজেকশন
             {
                 $project: {
                     _id: 0,
                     userId: "$_id",
                     totalPromptsCreated: 1,
                     totalCopies: 1,
-                    name: "$userDetails.name",
-                    email: "$userDetails.email",
-                    avatarUrl: "$userDetails.avatarUrl", // আপনার ডাটাবেজের ফিল্ড নেম দিন
-
-                    // 🌟 এক্সট্রা ফিচার: ইউজার সবথেকে বেশি কোন এআই টুলটি ব্যবহার করে (যেমন: "ChatGPT" বা "Midjourney")
-                    topAiTool: {
-                        $arrayElemAt: ["$aiToolsUsed", 0]
-                    },
-                    // 🌟 এক্সট্রা ফিচার: ইউজারের মেইন ক্যাটাগরি (যেমন: "development")
-                    mainCategory: {
-                        $arrayElemAt: ["$categoriesUsed", 0]
-                    }
+                    userName: "$userDetails.name",
+                    userImage: "$userDetails.userImage",
+                    email: "$userDetails.email"
                 }
             }
         ]).toArray();

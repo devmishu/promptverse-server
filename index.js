@@ -113,365 +113,6 @@ app.post('/api/prompts', async (req, res) => {
     }
 });
 
-// app.get('/api/prompts', async (req, res) => {
-//     try {
-
-//         const result = await prompts
-//             .find({})
-//             .project({
-//                 title: 1,
-//                 description: 1,
-//                 thumbnail: 1,
-//                 category: 1,
-//                 aiTool: 1,
-//                 difficulty: 1,
-//                 visibility: 1,
-//                 copyCount: 1
-//             })
-//             .toArray();
-
-//         res.status(200).send({
-//             success: true,
-//             data: result
-//         });
-
-//     } catch (error) {
-//         res.status(500).send({
-//             success: false,
-//             error: error.message
-//         });
-//     }
-// });
-
-// app.get('/api/prompts/:id', verifyToken, async (req, res) => {
-//     try {
-
-//         const { id } = req.params;
-
-//         const prompt = await prompts.findOne({
-//             _id: new ObjectId(id)
-//         });
-
-//         if (!prompt) {
-//             return res.status(404).send({
-//                 success: false,
-//                 message: 'Prompt not found'
-//             });
-//         }
-
-//         // Public Prompt
-//         if (prompt?.visibility === 'free') {
-//             return res.status(200).send({
-//                 success: true,
-//                 message: 'Prompt fetched successfully',
-//                 data: prompt
-//             });
-//         }
-
-//         // Logged in User
-//         const user = await users.findOne({
-//             email: req.user.email
-//         });
-
-//         console.log(prompt);
-//         console.log(user);
-
-//         // Premium User 
-//         if (user?.plan === 'premium') {
-//             return res.status(200).send({
-//                 success: true,
-//                 message: 'Prompt fetched successfully',
-//                 data: prompt
-//             });
-//         }
-
-//         // Free User + Private Prompt
-//         return res.status(200).send({
-//             success: true,
-//             message: 'Premium prompt locked',
-//             data: {
-//                 ...prompt,
-//                 content: null,
-//                 locked: true
-//             }
-//         });
-
-//     } catch (error) {
-
-//         console.log(error);
-
-//         res.status(500).send({
-//             success: false,
-//             message: 'Failed to get prompt',
-//             error: error.message
-//         });
-
-//     }
-// });
-
-
-
-// app.get('/api/prompts/:id', verifyToken, async (req, res) => {
-//     try {
-
-//         const { id } = req.params;
-
-//         const prompt = await prompts.findOne({
-//             _id: new ObjectId(id)
-//         });
-
-//         if (!prompt) {
-//             return res.status(404).send({
-//                 success: false,
-//                 message: 'Prompt not found'
-//             });
-//         }
-
-//         if (prompt.visibility === 'free') {
-//             return res.status(200).send({
-//                 success: true,
-//                 data: prompt
-//             });
-//         }
-
-//         return res.status(200).send({
-//             success: true,
-//             data: {
-//                 ...prompt,
-//                 content: null,
-//                 locked: true
-//             }
-//         });
-
-//     } catch (error) {
-
-//         console.log(error);
-
-//         res.status(500).send({
-//             success: false,
-//             message: 'Failed to get prompt',
-//             error: error.message
-//         });
-
-//     }
-// });
-
-// app.get('/api/prompts', async (req, res) => {
-//     try {
-//         const { search, sort, aiTool, category, difficulty } = req.query;
-
-//         // 🔒 ডিফল্ট কুয়েরিতেই শুধুমাত্র 'approved' প্রম্পট সেট করে দেওয়া হলো 
-//         // (এর ফলে পেন্ডিং বা রিজেক্টেড কোনো প্রম্পট ইউজার দেখতে পাবে না)
-//         let query = { status: 'approved' };
-
-//         console.log("backend category......", category);
-//         console.log("backend aiTool......", aiTool);
-//         // 🛡️ Regex Injection Protection
-//         // const escapeRegex = (text) => text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
-
-
-
-//         if (search) {
-//             query.$or = [
-//                 { title: { $regex: req.query.search, $options: 'i' } },
-//                 { description: { $regex: req.query.search, $options: 'i' } },
-//                 { aiTool: { $regex: req.query.search, $options: 'i' } },]
-//         }
-
-//         // 🛠 ফিল্টার কন্ডিশনস
-//         // if (aiTool) query.aiTool = { $regex: new RegExp(`^${escapeRegex(aiTool.trim())}$`, 'i') };
-//         // if (category) query.category = { $regex: new RegExp(`^${escapeRegex(category.trim())}$`, 'i') };
-//         // if (difficulty) query.difficulty = { $regex: new RegExp(`^${escapeRegex(difficulty.trim())}$`, 'i') };
-
-
-//         // ১. সাধারণ ফিল্টারসমূহ
-//         if (req.query.aiTool) {
-//             query.aiTool = req.query.aiTool;
-//         }
-//         if (category) {
-//             query.category = req.query.category;
-//         }
-//         if (difficulty) {
-//             query.difficulty = req.query.difficulty;
-//         }
-
-//         // 🔢 সর্টিং লজিক
-//         let sortOption = {};
-//         if (sort === 'most-copied' || sort === 'most-popular') {
-//             sortOption.copyCount = -1; // বেশি কপি হওয়া প্রম্পট আগে আসবে
-//         } else if (sort === 'latest') {
-//             sortOption.createdAt = -1; // নতুন প্রম্পট আগে আসবে
-//         } else {
-//             sortOption._id = -1; // ডিফল্ট সর্ট
-//         }
-
-
-
-//         const result = await prompts
-//             .find(query)
-//             .sort(sortOption)
-//             .project({
-//                 title: 1,
-//                 description: 1,
-//                 thumbnail: 1,
-//                 category: 1,
-//                 aiTool: 1,
-//                 difficulty: 1,
-//                 visibility: 1,
-//                 copyCount: 1,
-//                 createdAt: 1,
-//                 status: 1 // স্ট্যাটাস ফিল্ডটি রেসপন্সে রাখার জন্য প্রজেক্ট করা হলো
-//             })
-//             .toArray();
-
-//         res.status(200).send({
-//             success: true,
-//             count: result.length,
-//             data: result
-//         });
-
-//     } catch (error) {
-//         res.status(500).send({
-//             success: false,
-//             error: error.message
-//         });
-//     }
-// });
-
-
-// app.get('/api/prompts', async (req, res) => {
-//     try {
-
-//         const { search, sort, aiTool, category, difficulty } = req.query;
-
-//         console.log("aiTool..........", aiTool);
-
-//         // Only approved prompts
-//         let query = {
-//             status: 'approved'
-//         };
-
-//         // Search
-//         if (search) {
-//             query.$or = [
-//                 { title: { $regex: search, $options: 'i' } },
-//                 { description: { $regex: search, $options: 'i' } },
-//                 { aiTool: { $regex: search, $options: 'i' } }
-//             ];
-//         }
-
-//         // Filters
-//         if (aiTool) {
-//             query.aiTool = {
-//                 $regex: `^${aiTool.trim()}$`,
-//                 $options: "i"
-//             };
-//         }
-
-//         if (category) {
-//             query.category = {
-//                 $regex: `^${category.trim()}$`,
-//                 $options: "i"
-//             };
-//         }
-
-//         if (difficulty) {
-//             query.difficulty = {
-//                 $regex: `^${difficulty.trim()}$`,
-//                 $options: "i"
-//             };
-//         }
-
-//         // Sorting
-//         let sortOption = { _id: -1 };
-
-//         if (sort === 'most-copied' || sort === 'most-popular') {
-//             sortOption = { copyCount: -1 };
-//         } else if (sort === 'latest') {
-//             sortOption = { createdAt: -1 };
-//         }
-
-//         const result = await prompts.aggregate([
-//             {
-//                 $match: query
-//             },
-
-//             {
-//                 $lookup: {
-//                     from: "reviews",
-//                     let: {
-//                         promptId: { $toString: "$_id" }
-//                     },
-//                     pipeline: [
-//                         {
-//                             $match: {
-//                                 $expr: {
-//                                     $eq: ["$promptId", "$$promptId"]
-//                                 }
-//                             }
-//                         }
-//                     ],
-//                     as: "reviews"
-//                 }
-//             },
-
-//             {
-//                 $addFields: {
-//                     reviewCount: {
-//                         $size: "$reviews"
-//                     },
-//                     averageRating: {
-//                         $cond: [
-//                             { $gt: [{ $size: "$reviews" }, 0] },
-//                             { $avg: "$reviews.rating" },
-//                             0
-//                         ]
-//                     }
-//                 }
-//             },
-
-//             {
-//                 $project: {
-//                     title: 1,
-//                     description: 1,
-//                     thumbnail: 1,
-//                     category: 1,
-//                     aiTool: 1,
-//                     difficulty: 1,
-//                     visibility: 1,
-//                     copyCount: 1,
-//                     createdAt: 1,
-//                     status: 1,
-
-//                     reviewCount: 1,
-//                     averageRating: 1,
-
-//                 }
-//             },
-
-//             {
-//                 $sort: sortOption
-//             }
-//         ]).toArray();
-
-//         res.status(200).send({
-//             success: true,
-//             count: result.length,
-//             data: result
-//         });
-
-//     } catch (error) {
-
-//         console.error("GET /api/prompts Error:", error);
-
-//         res.status(500).send({
-//             success: false,
-//             error: error.message
-//         });
-//     }
-// });
-
-
 
 app.get('/api/prompts', async (req, res) => {
     try {
@@ -495,7 +136,8 @@ app.get('/api/prompts', async (req, res) => {
             query.$or = [
                 { title: { $regex: search, $options: 'i' } },
                 { description: { $regex: search, $options: 'i' } },
-                { aiTool: { $regex: search, $options: 'i' } }
+                { aiTool: { $regex: search, $options: 'i' } },
+                { tags: { $regex: search, $options: 'i' } },
             ];
         }
 
@@ -590,6 +232,7 @@ app.get('/api/prompts', async (req, res) => {
                     status: 1,
                     reviewCount: 1,
                     averageRating: 1,
+                    tags: 1,
                 }
             },
 
@@ -641,7 +284,6 @@ app.get('/api/prompts/:id', verifyToken, async (req, res) => {
             });
         }
 
-        // Logged in User
         const user = await users.findOne({
             email: req.user.email
         });
@@ -649,7 +291,7 @@ app.get('/api/prompts/:id', verifyToken, async (req, res) => {
         console.log(prompt);
         console.log(user);
 
-        // 🎯 Admin Access: এডমিন হলে যেকোনো প্রম্পটে ফুল অ্যাক্সেস পাবে (কোনো প্ল্যান লাগবে না)
+
         if (user?.role === 'admin') {
             return res.status(200).send({
                 success: true,
@@ -658,7 +300,7 @@ app.get('/api/prompts/:id', verifyToken, async (req, res) => {
             });
         }
 
-        // Public Prompt
+
         if (prompt?.visibility === 'free') {
             return res.status(200).send({
                 success: true,
@@ -667,7 +309,7 @@ app.get('/api/prompts/:id', verifyToken, async (req, res) => {
             });
         }
 
-        // Premium User 
+
         if (user?.plan === 'premium') {
             return res.status(200).send({
                 success: true,
@@ -676,7 +318,7 @@ app.get('/api/prompts/:id', verifyToken, async (req, res) => {
             });
         }
 
-        // Free User + Private Prompt
+
         return res.status(200).send({
             success: true,
             message: 'Premium prompt locked',
@@ -702,22 +344,23 @@ app.get('/api/prompts/:id', verifyToken, async (req, res) => {
 
 app.get('/api/featured/prompts', async (req, res) => {
     try {
-        // ১. শুধুমাত্রapproved প্রম্পটগুলো ফিল্টার করার কোয়েরি
+
         let query = {
-            status: 'approved'
+            status: 'approved',
+            isFeatured: true,
         };
 
-        // ২. ফিচারড প্রম্পটের জন্য ডিফল্ট সর্টিং (সবচেয়ে বেশি কপি হওয়া প্রম্পট আগে আসবে)
+
         let sortOption = { copyCount: -1 };
 
         const result = await prompts.aggregate([
             {
-                // শুধু অ্যাপ্রুভড ডাটা ম্যাচ করবে
+
                 $match: query
             },
 
             {
-                // রিভিও কালেকশন থেকে ডাটা লুকআপ
+
                 $lookup: {
                     from: "reviews",
                     let: {
@@ -737,7 +380,7 @@ app.get('/api/featured/prompts', async (req, res) => {
             },
 
             {
-                // রিভিউ কাউন্ট এবং অ্যাভারেজ রেটিং ক্যালকুলেশন
+
                 $addFields: {
                     reviewCount: {
                         $size: "$reviews"
@@ -753,7 +396,7 @@ app.get('/api/featured/prompts', async (req, res) => {
             },
 
             {
-                // আপনার প্রোভাইড করা হুবহু সেম ডাটা প্রজেকশন
+
                 $project: {
                     title: 1,
                     description: 1,
@@ -772,12 +415,12 @@ app.get('/api/featured/prompts', async (req, res) => {
             },
 
             {
-                // পপুলারিটি অনুযায়ী সর্ট করা
+
                 $sort: sortOption
             },
 
             {
-                // 🌟 রিকোয়ারমেন্ট অনুযায়ী শুধুমাত্র প্রথম ৬টি ডাটা লিমিট করা হলো
+
                 $limit: 6
             }
         ]).toArray();
@@ -823,26 +466,6 @@ app.get('/api/my/prompts', async (req, res) => {
     }
 });
 
-
-// app.get('/api/admin/prompts', async (req, res) => {
-//     try {
-
-//         const result = await prompts.find().toArray();
-
-//         res.status(200).send({
-//             success: true,
-//             message: 'all prompts get successfully',
-//             data: result
-//         })
-//     } catch (error) {
-//         console.log(error);
-//         res.status(500).send({
-//             success: false,
-//             message: 'Failed get  all prompts ',
-//             error: error.message
-//         })
-//     }
-// });
 
 app.get('/api/admin/prompts', async (req, res) => {
     try {
@@ -928,7 +551,7 @@ app.delete('/api/prompt/:id', async (req, res) => {
     }
 });
 
-// edit my added cars
+
 app.patch('/api/prompts/:id', async (req, res) => {
 
     const data = req.body;
@@ -957,12 +580,11 @@ app.patch('/api/prompts/:id', async (req, res) => {
     }
 });
 
-// প্রম্পটের কপি কাউন্ট ডাটাবেজে ১ বাড়ানোর PATCH API
 app.patch('/api/prompts/:id/copy', async (req, res) => {
     try {
         const { id } = req.params;
 
-        // মঙ্গোডিবি-র $inc অপারেটর ব্যবহার করে copyCount ১ বাড়ানো হচ্ছে
+
         const result = await prompts.updateOne(
             { _id: new ObjectId(id) },
             { $inc: { copyCount: 1 } }
@@ -981,34 +603,12 @@ app.patch('/api/prompts/:id/copy', async (req, res) => {
 
 
 
-
-// bookmark related api
-// app.post('/api/bookmarks', async (req, res) => {
-//     try {
-//         const bookmark = req.body;
-//         const result = await bookmarks.insertOne(bookmark);
-
-//         res.status(200).send({
-//             success: true,
-//             message: 'prompt bookmarked successfully',
-//             data: result
-//         })
-//     } catch (error) {
-//         console.log(error);
-//         res.status(500).send({
-//             success: false,
-//             message: 'Failed to add prompt ',
-//             error: error.message
-//         })
-//     }
-// });
-
 app.post('/api/bookmarks', async (req, res) => {
     try {
         const bookmark = req.body;
 
-        // ১. বডি থেকে userId এবং promptId আলাদা করা হচ্ছে
-        const { userId, promptId } = bookmark; // আপনার ফ্রন্টেন্ড স্ট্রাকচারে প্রম্পটের আইডিটি সম্ভবত _id নামে যাচ্ছে
+
+        const { userId, promptId } = bookmark;
 
         if (!userId || !promptId) {
             return res.status(400).send({
@@ -1017,18 +617,18 @@ app.post('/api/bookmarks', async (req, res) => {
             });
         }
 
-        // ২. ডাটাবেজে চেক করা হচ্ছে এই ইউজার এই প্রম্পট অলরেডি বুকমার্ক করেছে কিনা
+
         const existingBookmark = await bookmarks.findOne({ userId: userId, promptId: promptId });
 
         if (existingBookmark) {
             return res.status(400).send({
                 success: false,
-                alreadyBookmarked: true, // ফ্রন্টেন্ড ট্র্যাকিংয়ের জন্য
+                alreadyBookmarked: true,
                 message: 'You have already bookmarked this prompt.'
             });
         }
 
-        // ৩. ডুপ্লিকেট না থাকলে নতুন বুকমার্ক ইনসার্ট হবে
+
         const result = await bookmarks.insertOne(bookmark);
 
         res.status(200).send({
@@ -1052,12 +652,10 @@ app.get('/api/bookmarks/check', async (req, res) => {
     res.send({ isBookmarked: !!existing });
 });
 
-
-// ১. ইউজার এই প্রম্পটে অলরেডি রিভিউ দিয়েছে কিনা চেক করার এপিআই
 app.get('/api/reviews/check', async (req, res) => {
     try {
         const { userId, promptId } = req.query;
-        // আপনার কালেকশনের নাম অনুযায়ী পরিবর্তন করে নিবেন (যেমন: reviews)
+
         const existing = await reviews.findOne({ userId, promptId });
         res.send({ hasReviewed: !!existing });
     } catch (error) {
@@ -1065,11 +663,10 @@ app.get('/api/reviews/check', async (req, res) => {
     }
 });
 
-// ২. ইউজার এই প্রম্পটে অলরেডি রিপোর্ট করেছে কিনা চেক করার এপিআই
 app.get('/api/reports/check', async (req, res) => {
     try {
         const { userId, promptId } = req.query;
-        // আপনার কালেকশনের নাম অনুযায়ী পরিবর্তন করে নিবেন (যেমন: reports)
+
         const existing = await reports.findOne({ userId, promptId });
         res.send({ hasReported: !!existing });
     } catch (error) {
@@ -1144,7 +741,7 @@ app.post('/api/reviews', async (req, res) => {
     try {
         const review = req.body;
 
-        // ১. বডি থেকে userId এবং promptId আলাদা করে নেওয়া হচ্ছে (আপনার ডাটা স্ট্রাকচার অনুযায়ী ফিল্ডের নাম নিশ্চিত হয়ে নিবেন)
+
         const { userId, promptId } = review;
 
         if (!userId || !promptId) {
@@ -1154,13 +751,13 @@ app.post('/api/reviews', async (req, res) => {
             });
         }
 
-        // ২. ডাটাবেজে চেক করা হচ্ছে এই ইউজার এই প্রম্পটে অলরেডি রিভিউ দিয়েছে কিনা
+
         const existingReview = await reviews.findOne({ userId: userId, promptId: promptId });
 
         if (existingReview) {
             return res.status(400).send({
                 success: false,
-                alreadyReviewed: true, // ফ্রন্টেন্ডে ট্র্যাকিং সহজ করার জন্য
+                alreadyReviewed: true,
                 message: 'You have already reviewed this prompt.'
             });
         }
@@ -1169,7 +766,7 @@ app.post('/api/reviews', async (req, res) => {
             ...review,
             createdAt: new Date().toLocaleString(),
         }
-        // ৩. অলরেডি রিভিউ না থাকলে নতুন রিভিউ ডাটাবেজে সেভ হবে
+
         const result = await reviews.insertOne(reviewInfo);
 
         res.status(200).send({
@@ -1194,7 +791,7 @@ app.get('/api/reviews', async (req, res) => {
     try {
 
         const result = await reviews.find().toArray()
-        
+
         res.status(200).send({
             success: true,
             message: 'reviews get successfully',
@@ -1261,11 +858,234 @@ app.get('/api/prompt/reviews', async (req, res) => {
 });
 
 
+app.patch('/api/admin/prompts/:id/status', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({
+                success: false,
+                error: "Invalid Prompt ID"
+            });
+        }
+
+        const allowedStatuses = ['pending', 'approved', 'rejected'];
+        if (!status || !allowedStatuses.includes(status.toLowerCase())) {
+            return res.status(400).send({
+                success: false,
+                error: "Invalid status. Status must be pending, approved, or rejected."
+            });
+        }
+
+
+        const query = { _id: new ObjectId(id) };
+        const updateDoc = {
+            $set: {
+                status: status.toLowerCase(),
+                updatedAt: new Date()
+            },
+        };
+
+        const result = await prompts.updateOne(query, updateDoc);
+
+        if (result.matchedCount === 0) {
+            return res.status(404).send({
+                success: false,
+                error: "Prompt not found"
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: `Prompt status successfully updated to ${status}`,
+            data: result
+        });
+
+    } catch (error) {
+        console.error("Admin Status Update Error:", error);
+        res.status(500).send({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+app.patch('/api/admin/prompts/:id/reject', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({
+                success: false,
+                error: "Invalid Prompt ID"
+            });
+        }
+
+        const query = { _id: new ObjectId(id) };
+        const updateDoc = {
+            $set: {
+                status: 'rejected',
+                rejectReason: reason || "Does not meet community guidelines",
+                updatedAt: new Date()
+            },
+        };
+
+        const result = await prompts.updateOne(query, updateDoc);
+
+        if (result.matchedCount === 0) {
+            return res.status(404).send({
+                success: false,
+                error: "Prompt not found"
+            });
+        }
+
+        res.status(200).send({
+            success: true,
+            message: "Prompt has been rejected successfully",
+            data: result
+        });
+
+    } catch (error) {
+        console.error("Admin Reject Error:", error);
+        res.status(500).send({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+app.patch('/api/admin/prompts/:id/featured', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isFeatured } = req.body; // বডি থেকে true অথবা false আসবে
+
+        // ভ্যালিডেশন: বডিতে true/false পাঠানো হয়েছে কিনা চেক করা
+        if (typeof isFeatured !== 'boolean') {
+            return res.status(400).send({
+                success: false,
+                message: "isFeatured must be a boolean (true or false)"
+            });
+        }
+
+        const query = { _id: new ObjectId(id) };
+        const updateDoc = {
+            $set: { isFeatured: isFeatured }
+        };
+
+        const result = await prompts.updateOne(query, updateDoc);
+
+        if (result.modifiedCount > 0) {
+            res.status(200).send({
+                success: true,
+                message: `Prompt featured status updated to ${isFeatured} successfully!`,
+                data: result
+            });
+        } else {
+            res.status(404).send({
+                success: false,
+                message: "Prompt not found or no changes made"
+            });
+        }
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: "Failed to update featured status",
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/admin/analytics', async (req, res) => {
+    try {
+        // ১. মোট ইউজারের সংখ্যা
+        const totalUsers = await users.countDocuments();
+
+        // ২. মোট প্রম্পটের সংখ্যা
+        const totalPrompts = await prompts.countDocuments();
+
+        // ৩. মোট রিভিউর সংখ্যা
+        const totalReviews = await reviews.countDocuments();
+
+        // ৪. মোট কপির সংখ্যা বের করার লজিক
+        const copyResult = await prompts.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    totalCopies: { $sum: "$copyCount" }
+                }
+            }
+        ]).toArray();
+
+        const totalCopies = copyResult.length > 0 ? copyResult[0].totalCopies : 0;
+
+        // 📊 ৫. ১ম চার্ট: User Growth (মাসের নাম অনুযায়ী গ্রোথ ট্র্যাক)
+        const allUsers = await users.find({}).toArray();
+        const userMonthsObj = {};
+
+        allUsers.forEach(user => {
+            if (user.createdAt) {
+                const date = new Date(user.createdAt);
+                const monthName = date.toLocaleString('en-US', { month: 'short' });
+                userMonthsObj[monthName] = (userMonthsObj[monthName] || 0) + 1;
+            }
+        });
+
+        const userGrowthData = [];
+        for (const month in userMonthsObj) {
+            userGrowthData.push({
+                name: month,
+                users: userMonthsObj[month]
+            });
+        }
+
+        // 📊 ৬. ২য় চার্ট: Top 5 Copied Prompts (সেরা ৫টি ও ছোট টাইটেল)
+        const topPromptsRaw = await prompts.find({})
+            .sort({ copyCount: -1 })
+            .limit(5)
+            .toArray();
+
+        const topPromptsData = topPromptsRaw.map(p => {
+            const originalTitle = p.title || "Untitled";
+            const shortTitle = originalTitle.length > 12
+                ? originalTitle.substring(0, 12) + '...'
+                : originalTitle;
+            return {
+                name: shortTitle,
+                copies: p.copyCount || 0
+            };
+        });
+
+        // 🚀 রেসপন্স পাঠানো (আপনার আগের ডেটা ফরম্যাট একদম অক্ষত রেখে ভেতরে চার্টের ডেটা দেওয়া হলো)
+        res.status(200).send({
+            success: true,
+            data: {
+                totalUsers,
+                totalPrompts,
+                totalReviews,
+                totalCopies,
+                userGrowthData, // এক্সট্রা চার্ট ডেটা ১
+                topPromptsData  // এক্সট্রা চার্ট ডেটা ২
+            }
+        });
+
+    } catch (error) {
+        console.error("Analytics API Error:", error);
+        res.status(500).send({
+            success: false,
+            message: "Failed to fetch analytics data",
+            error: error.message
+        });
+    }
+});
 
 
 
-
-// ১. নতুন রিপোর্ট তৈরি করার POST API
+// report related api
 app.post('/api/reports', async (req, res) => {
     try {
         const report = req.body;
@@ -1362,72 +1182,7 @@ app.delete('/api/admin/reports/:id', async (req, res) => {
     }
 });
 
-// creator related api
-app.get('/api/top/creators', async (req, res) => {
-    try {
-        const result = await prompts.aggregate([
-            // ১. প্রম্পটের স্ট্যাটাস ফিল্টার
-            { $match: { status: "approved" } },
 
-            // ২. userId অনুযায়ী গ্রুপ করা
-            {
-                $group: {
-                    _id: "$userId",
-                    totalPromptsCreated: { $sum: 1 },
-                    totalCopies: { $sum: "$copyCount" }
-                }
-            },
-
-            // ৩. সর্বোচ্চ প্রম্পট সংখ্যার ওপর ভিত্তি করে সর্ট করা
-            { $sort: { totalPromptsCreated: -1 } },
-
-            // ৪. টপ ১০ ক্রিয়েটর লিমিট
-            { $limit: 10 },
-
-            // ৫. ইউজার কালেকশন থেকে ডাটা নিয়ে আসা (কালেকশন নাম ফিক্স করা হয়েছে)
-            {
-                $lookup: {
-                    from: "user", // 🎯 আপনার ডিক্লেয়ারেশন অনুযায়ী "users" পরিবর্তন করে "user" করা হলো
-                    let: { creatorId: "$_id" },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: {
-                                    $or: [
-                                        { $eq: ["$_id", "$$creatorId"] },
-                                        { $eq: ["$_id", { $toObjectId: "$$creatorId" }] },
-                                        { $eq: [{ $toObjectId: "$_id" }, "$$creatorId"] }
-                                    ]
-                                }
-                            }
-                        }
-                    ],
-                    as: "userDetails"
-                }
-            },
-
-            // ६. lookup অ্যারে-কে অবজেক্টে রূপান্তর
-            { $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } },
-
-            // ৭. ফাইনাল আউটপুট প্রজেকশন
-            {
-                $project: {
-                    _id: 0,
-                    userId: "$_id",
-                    totalPromptsCreated: 1,
-                    totalCopies: 1,
-                    userName: "$userDetails.name",
-                    userImage: "$userDetails.userImage",
-                    email: "$userDetails.email"
-                }
-            }
-        ]).toArray();
-
-        res.send({ success: true, data: result });
-    } catch (error) {
-        res.status(500).send({ success: false, error: error.message });
-    }
-});
 
 
 
@@ -1447,7 +1202,7 @@ app.post('/api/subscriptions', async (req, res) => {
 
         const updateDocument = {
             $set: {
-                plan: subscription.planId, // আপনার রিকোয়েস্ট বডিতে planId থাকতে হবে
+                plan: subscription.planId,
             },
         };
 
@@ -1497,6 +1252,205 @@ app.get('/api/admin/subscriptions', async (req, res) => {
 
 
 
+// creator related api
+// creator related api
+app.get('/api/top/creators', async (req, res) => {
+    try {
+        const result = await prompts.aggregate([
+
+            { $match: { status: "approved" } },
+
+
+            {
+                $group: {
+                    _id: "$userId",
+                    totalPromptsCreated: { $sum: 1 },
+                    totalCopies: { $sum: "$copyCount" }
+                }
+            },
+
+
+            { $sort: { totalPromptsCreated: -1 } },
+
+
+            { $limit: 10 },
+
+
+            {
+                $lookup: {
+                    from: "user",
+                    let: { creatorId: "$_id" },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $or: [
+                                        { $eq: ["$_id", "$$creatorId"] },
+                                        { $eq: ["$_id", { $toObjectId: "$$creatorId" }] },
+                                        { $eq: [{ $toObjectId: "$_id" }, "$$creatorId"] }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    as: "userDetails"
+                }
+            },
+
+
+            { $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } },
+
+
+            {
+                $project: {
+                    _id: 0,
+                    userId: "$_id",
+                    totalPromptsCreated: 1,
+                    totalCopies: 1,
+                    userName: "$userDetails.name",
+                    userImage: "$userDetails.userImage",
+                    email: "$userDetails.email"
+                }
+            }
+        ]).toArray();
+
+        res.send({ success: true, data: result });
+    } catch (error) {
+        res.status(500).send({ success: false, error: error.message });
+    }
+});
+
+app.get('/api/analytics/:creatorId', async (req, res) => {
+    try {
+        const { creatorId } = req.params;
+
+        if (!creatorId) {
+            return res.status(400).send({
+                success: false,
+                error: "Creator ID is required"
+            });
+        }
+
+       
+        const userId = ObjectId.isValid(creatorId) ? new ObjectId(creatorId) : creatorId;
+
+        
+        const stats = await prompts.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { creatorId: userId },
+                        { userId: userId },
+                        { "creatorId": creatorId },
+                        { "userId": creatorId }
+                    ]
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalPrompts: { $sum: 1 },
+                    totalCopies: { $sum: { $ifNull: ["$copyCount", 0] } },
+                    totalBookmarks: { $sum: { $ifNull: ["$bookmarks", 0] } }
+                }
+            }
+        ]).toArray();
+
+       
+        const defaultStats = {
+            totalPrompts: 0,
+            totalCopies: 0,
+            totalBookmarks: 0
+        };
+
+        const finalStats = stats[0] || defaultStats;
+
+
+        const topCopiedPrompts = await prompts.find({
+            $or: [
+                { creatorId: userId },
+                { userId: userId },
+                { "creatorId": creatorId },
+                { "userId": creatorId }
+            ]
+        })
+            .sort({ copyCount: -1 }) 
+            .limit(7)                 
+            .toArray();
+
+        
+        const copiesChartData = [];
+        for (let i = 0; i < topCopiedPrompts.length; i++) {
+            const originalTitle = topCopiedPrompts[i].title || "Untitled";
+
+            
+            const shortTitle = originalTitle.length > 12
+                ? originalTitle.substring(0, 12) + '...'
+                : originalTitle;
+
+            copiesChartData.push({
+                name: shortTitle,
+                copies: topCopiedPrompts[i].copyCount || 0
+            });
+        }
+
+
+        
+        const allMyPrompts = await prompts.find({
+            $or: [
+                { creatorId: userId },
+                { userId: userId },
+                { "creatorId": creatorId },
+                { "userId": creatorId }
+            ]
+        }).toArray();
+
+       
+        const monthsObj = {};
+        allMyPrompts.forEach(p => {
+            if (p.createdAt) {
+                const date = new Date(p.createdAt);
+                const monthName = date.toLocaleString('en-US', { month: 'short' });
+
+                if (monthsObj[monthName]) {
+                    monthsObj[monthName] = monthsObj[monthName] + 1;
+                } else {
+                    monthsObj[monthName] = 1;
+                }
+            }
+        });
+
+        const growthChartData = [];
+        for (const month in monthsObj) {
+            growthChartData.push({
+                month: month,
+                prompts: monthsObj[month]
+            });
+        }
+
+
+        
+        res.status(200).send({
+            success: true,
+            data: {
+                totalPrompts: finalStats.totalPrompts,
+                totalCopies: finalStats.totalCopies,
+                totalBookmarks: finalStats.totalBookmarks,
+                copiesChartData: copiesChartData,   
+                growthChartData: growthChartData    
+            }
+        });
+
+    } catch (error) {
+        console.error("Analytics API Error:", error);
+        res.status(500).send({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+
 
 module.exports = app;
 
@@ -1543,12 +1497,3 @@ app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
 
-
-/**
- * tumi amr ay website them collor use kore amr jonno akta profile components banaw :
- * content: 
- * top: profile photo,email, name, plan jodi premium hoy premium badge,  role badge, arekta plan badge lifitime, 
- * midle: 2 ta card takbe aktate Prompts Published length,icon and areck ta card acount varification status, 
- * last: user ar plan jodi free take tahole plan upgrade korar jonno detail page je upgrade card ta use korecile ota same to same use korbe ar jodi plan premium take tahple akta right mark icon and akta message leka takbe lifitim premium........................
- * using hero ui (version 3.0.1) data gula sob props akare jabe
- */

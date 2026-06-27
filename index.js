@@ -58,6 +58,8 @@ const verifyToken = async (req, res, next) => {
 
     const token = header.split(' ')[1];
 
+    console.log("user token:", token);
+
     if (!token) {
         return res.status(401).send({
             message: "Unauthorize acsess"
@@ -69,6 +71,8 @@ const verifyToken = async (req, res, next) => {
 
 
     const userId = session?.userId;
+
+
 
     const userQuary = {
         _id: userId
@@ -83,12 +87,30 @@ const verifyToken = async (req, res, next) => {
     next();
 }
 
+const verifyUser = (req, res, next) => {
+    if (req.user?.role !== "user") {
+        return res.status(403).send({ message: "Forbidden accsess" });
+    }
+    next();
+}
+const verifyCreator = (req, res, next) => {
+    if (req.user?.role !== "creator") {
+        return res.status(403).send({ message: "Forbidden accsess" });
+    }
+    next();
+}
 
+const verifyAdmin = (req, res, next) => {
+    if (req.user?.role !== "admin") {
+        return res.status(403).send({ message: "Forbidden accsess" });
+    }
+    next();
+}
 
 
 
 // prompts related api 
-app.post('/api/prompts', async (req, res) => {
+app.post('/api/prompts', verifyToken, verifyAdmin, async (req, res) => {
     try {
         const prompt = req.body;
 
@@ -342,6 +364,8 @@ app.get('/api/prompts/:id', verifyToken, async (req, res) => {
     }
 });
 
+
+
 app.get('/api/featured/prompts', async (req, res) => {
     try {
 
@@ -441,7 +465,8 @@ app.get('/api/featured/prompts', async (req, res) => {
     }
 });
 
-app.get('/api/my/prompts', async (req, res) => {
+
+app.get('/api/my/prompts', verifyToken, async (req, res) => {
     try {
         const query = {};
         if (req.query.userId) {
@@ -467,8 +492,11 @@ app.get('/api/my/prompts', async (req, res) => {
 });
 
 
-app.get('/api/admin/prompts', async (req, res) => {
+
+
+app.get('/api/admin/prompts', verifyToken, verifyAdmin, async (req, res) => {
     try {
+
 
         let result;
         let total;
@@ -518,38 +546,95 @@ app.get('/api/admin/prompts', async (req, res) => {
     }
 });
 
-app.delete('/api/prompt/:id', async (req, res) => {
 
-    const { id } = req.params;
 
-    console.log(id);
+// app.delete('/api/prompt/:id', async (req, res) => {
 
-    const query = {
-        _id: new ObjectId(id)
-    }
+//     const { id } = req.params;
 
+//     console.log(id);
+
+//     const query = {
+//         _id: new ObjectId(id)
+//     }
+
+//     try {
+
+//         const deletePrompt = await prompts.deleteOne(query);
+
+//         console.log(deletePrompt);
+
+//         res.status(200).send({
+//             success: true,
+//             message: 'Delete prompt successfully',
+//             data: deletePrompt
+//         });
+
+//     } catch (error) {
+
+//         console.log(error);
+//         res.status(500).send({
+//             success: false,
+//             message: 'Delete prompt failed',
+//             error: error.message
+//         });
+//     }
+// });
+
+
+app.delete('/api/prompt/:id', verifyToken, async (req, res) => {
     try {
+        const { id } = req.params;
 
-        const deletePrompt = await prompts.deleteOne(query);
+        // console.log("delete id", req.user.id);
 
-        console.log(deletePrompt);
+        const prompt = await prompts.findOne({
+            _id: new ObjectId(id)
+        });
+
+
+
+        if (!prompt) {
+            return res.status(404).send({
+                success: false,
+                message: "Prompt not found"
+            });
+        }
+
+
+
+        if (req.user.role !== "admin") {
+
+            // User/Creator শুধু নিজের prompt delete করতে পারবে
+            if (prompt.userId !== String(req.user._id)) {
+                return res.status(403).send({
+                    success: false,
+                    message: "Forbidden access"
+                });
+            }
+        }
+
+        const result = await prompts.deleteOne({
+            _id: new ObjectId(id)
+        });
 
         res.status(200).send({
             success: true,
-            message: 'Delete prompt successfully',
-            data: deletePrompt
+            message: "Delete prompt successfully",
+            data: result
         });
 
     } catch (error) {
-
-        console.log(error);
         res.status(500).send({
             success: false,
-            message: 'Delete prompt failed',
+            message: "Delete prompt failed",
             error: error.message
         });
     }
 });
+
+
+
 
 
 app.patch('/api/prompts/:id', async (req, res) => {
@@ -580,7 +665,8 @@ app.patch('/api/prompts/:id', async (req, res) => {
     }
 });
 
-app.patch('/api/prompts/:id/copy', async (req, res) => {
+
+app.patch('/api/prompts/:id/copy', verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -703,7 +789,7 @@ app.get('/api/my/bookmarks', verifyToken, async (req, res) => {
     }
 });
 
-app.delete('/api/bookmarks/:id', async (req, res) => {
+app.delete('/api/bookmarks/:id', verifyToken, async (req, res) => {
 
     const { id } = req.params;
 
@@ -736,8 +822,11 @@ app.delete('/api/bookmarks/:id', async (req, res) => {
     }
 });
 
+
+
+
 // reviews related api 
-app.post('/api/reviews', async (req, res) => {
+app.post('/api/reviews', verifyToken, async (req, res) => {
     try {
         const review = req.body;
 
@@ -785,29 +874,7 @@ app.post('/api/reviews', async (req, res) => {
     }
 });
 
-
-
-app.get('/api/reviews', async (req, res) => {
-    try {
-
-        const result = await reviews.find().toArray()
-
-        res.status(200).send({
-            success: true,
-            message: 'reviews get successfully',
-            data: result
-        })
-    } catch (error) {
-        console.log(error);
-        res.status(500).send({
-            success: false,
-            message: 'Failed get  reviews ',
-            error: error.message
-        })
-    }
-});
-
-app.get('/api/my/reviews', async (req, res) => {
+app.get('/api/my/reviews',verifyToken, async (req, res) => {
     try {
         const query = {};
         if (req.query.userId) {
@@ -832,7 +899,33 @@ app.get('/api/my/reviews', async (req, res) => {
     }
 });
 
-app.get('/api/prompt/reviews', async (req, res) => {
+
+
+
+
+app.get('/api/reviews', async (req, res) => {
+    try {
+
+        const result = await reviews.find().limit(6).toArray()
+
+        res.status(200).send({
+            success: true,
+            message: 'reviews get successfully',
+            data: result
+        })
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: 'Failed get  reviews ',
+            error: error.message
+        })
+    }
+});
+
+
+
+app.get('/api/prompt/reviews', verifyToken, async (req, res) => {
     try {
         const query = {};
         if (req.query.promptId) {
@@ -857,8 +950,7 @@ app.get('/api/prompt/reviews', async (req, res) => {
     }
 });
 
-
-app.patch('/api/admin/prompts/:id/status', async (req, res) => {
+app.patch('/api/admin/prompts/:id/status', verifyToken, verifyAdmin, async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
@@ -912,7 +1004,7 @@ app.patch('/api/admin/prompts/:id/status', async (req, res) => {
     }
 });
 
-app.patch('/api/admin/prompts/:id/reject', async (req, res) => {
+app.patch('/api/admin/prompts/:id/reject', verifyToken, verifyAdmin, async (req, res) => {
     try {
         const { id } = req.params;
         const { reason } = req.body;
@@ -957,7 +1049,7 @@ app.patch('/api/admin/prompts/:id/reject', async (req, res) => {
     }
 });
 
-app.patch('/api/admin/prompts/:id/featured', async (req, res) => {
+app.patch('/api/admin/prompts/:id/featured', verifyToken, verifyAdmin, async (req, res) => {
     try {
         const { id } = req.params;
         const { isFeatured } = req.body; // বডি থেকে true অথবা false আসবে
@@ -1000,7 +1092,7 @@ app.patch('/api/admin/prompts/:id/featured', async (req, res) => {
     }
 });
 
-app.get('/api/admin/analytics', async (req, res) => {
+app.get('/api/admin/analytics', verifyToken, verifyAdmin, async (req, res) => {
     try {
         // ১. মোট ইউজারের সংখ্যা
         const totalUsers = await users.countDocuments();
@@ -1086,7 +1178,7 @@ app.get('/api/admin/analytics', async (req, res) => {
 
 
 // report related api
-app.post('/api/reports', async (req, res) => {
+app.post('/api/reports', verifyToken, async (req, res) => {
     try {
         const report = req.body;
 
@@ -1130,7 +1222,7 @@ app.post('/api/reports', async (req, res) => {
     }
 });
 
-app.get('/api/admin/reports', async (req, res) => {
+app.get('/api/admin/reports', verifyToken, verifyAdmin, async (req, res) => {
     try {
 
         const result = await reports.find().toArray();
@@ -1150,7 +1242,7 @@ app.get('/api/admin/reports', async (req, res) => {
     }
 });
 
-app.delete('/api/admin/reports/:id', async (req, res) => {
+app.delete('/api/admin/reports/:id', verifyToken, verifyAdmin, async (req, res) => {
 
     const { id } = req.params;
 
@@ -1188,7 +1280,7 @@ app.delete('/api/admin/reports/:id', async (req, res) => {
 
 // stripe pamyent related api
 
-app.post('/api/subscriptions', async (req, res) => {
+app.post('/api/subscriptions', verifyToken, async (req, res) => {
     try {
         const subscription = req.body;
         console.log("planId:,,", subscription.planId);
@@ -1230,7 +1322,7 @@ app.post('/api/subscriptions', async (req, res) => {
 });
 
 
-app.get('/api/admin/subscriptions', async (req, res) => {
+app.get('/api/admin/subscriptions', verifyToken, verifyAdmin, async (req, res) => {
     try {
 
         const result = await subscriptions.find().toArray();
@@ -1252,7 +1344,7 @@ app.get('/api/admin/subscriptions', async (req, res) => {
 
 
 
-// creator related api
+
 // creator related api
 app.get('/api/top/creators', async (req, res) => {
     try {
@@ -1320,7 +1412,7 @@ app.get('/api/top/creators', async (req, res) => {
     }
 });
 
-app.get('/api/analytics/:creatorId', async (req, res) => {
+app.get('/api/analytics/:creatorId', verifyToken, async (req, res) => {
     try {
         const { creatorId } = req.params;
 
@@ -1331,10 +1423,10 @@ app.get('/api/analytics/:creatorId', async (req, res) => {
             });
         }
 
-       
+
         const userId = ObjectId.isValid(creatorId) ? new ObjectId(creatorId) : creatorId;
 
-        
+
         const stats = await prompts.aggregate([
             {
                 $match: {
@@ -1356,7 +1448,7 @@ app.get('/api/analytics/:creatorId', async (req, res) => {
             }
         ]).toArray();
 
-       
+
         const defaultStats = {
             totalPrompts: 0,
             totalCopies: 0,
@@ -1374,16 +1466,16 @@ app.get('/api/analytics/:creatorId', async (req, res) => {
                 { "userId": creatorId }
             ]
         })
-            .sort({ copyCount: -1 }) 
-            .limit(7)                 
+            .sort({ copyCount: -1 })
+            .limit(7)
             .toArray();
 
-        
+
         const copiesChartData = [];
         for (let i = 0; i < topCopiedPrompts.length; i++) {
             const originalTitle = topCopiedPrompts[i].title || "Untitled";
 
-            
+
             const shortTitle = originalTitle.length > 12
                 ? originalTitle.substring(0, 12) + '...'
                 : originalTitle;
@@ -1395,7 +1487,7 @@ app.get('/api/analytics/:creatorId', async (req, res) => {
         }
 
 
-        
+
         const allMyPrompts = await prompts.find({
             $or: [
                 { creatorId: userId },
@@ -1405,7 +1497,7 @@ app.get('/api/analytics/:creatorId', async (req, res) => {
             ]
         }).toArray();
 
-       
+
         const monthsObj = {};
         allMyPrompts.forEach(p => {
             if (p.createdAt) {
@@ -1429,15 +1521,15 @@ app.get('/api/analytics/:creatorId', async (req, res) => {
         }
 
 
-        
+
         res.status(200).send({
             success: true,
             data: {
                 totalPrompts: finalStats.totalPrompts,
                 totalCopies: finalStats.totalCopies,
                 totalBookmarks: finalStats.totalBookmarks,
-                copiesChartData: copiesChartData,   
-                growthChartData: growthChartData    
+                copiesChartData: copiesChartData,
+                growthChartData: growthChartData
             }
         });
 

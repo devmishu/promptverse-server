@@ -46,6 +46,7 @@ const reports = db.collection('reports');
 const users = db.collection('user');
 const sessions = db.collection('session');
 const subscriptions = db.collection('subscriptions');
+const warnings = db.collection('warnings');
 
 
 const verifyToken = async (req, res, next) => {
@@ -110,7 +111,8 @@ const verifyAdmin = (req, res, next) => {
 
 
 // prompts related api 
-app.post('/api/prompts', verifyToken, verifyAdmin, async (req, res) => {
+
+app.post('/api/prompts', verifyToken, async (req, res) => {
     try {
         const prompt = req.body;
 
@@ -146,7 +148,7 @@ app.get('/api/prompts', async (req, res) => {
             category,
             difficulty,
             page,
-            itemsPerPage
+            itemsPerPage,
         } = req.query;
 
         let query = {
@@ -188,9 +190,12 @@ app.get('/api/prompts', async (req, res) => {
         // Sorting
         let sortOption = { _id: -1 };
 
-        if (sort === 'most-copied' || sort === 'most-popular') {
+        if (sort === 'most-copied') {
             sortOption = { copyCount: -1 };
-        } else if (sort === 'latest') {
+        } else if (sort === 'most-popular') {
+            sortOption = { averageRating: -1 };
+        }
+        else if (sort === 'latest') {
             sortOption = { createdAt: -1 };
         }
 
@@ -366,6 +371,11 @@ app.get('/api/prompts/:id', verifyToken, async (req, res) => {
 
 
 
+
+
+
+
+
 app.get('/api/featured/prompts', async (req, res) => {
     try {
 
@@ -465,7 +475,6 @@ app.get('/api/featured/prompts', async (req, res) => {
     }
 });
 
-
 app.get('/api/my/prompts', verifyToken, async (req, res) => {
     try {
         const query = {};
@@ -490,9 +499,6 @@ app.get('/api/my/prompts', verifyToken, async (req, res) => {
         })
     }
 });
-
-
-
 
 app.get('/api/admin/prompts', verifyToken, verifyAdmin, async (req, res) => {
     try {
@@ -548,40 +554,6 @@ app.get('/api/admin/prompts', verifyToken, verifyAdmin, async (req, res) => {
 
 
 
-// app.delete('/api/prompt/:id', async (req, res) => {
-
-//     const { id } = req.params;
-
-//     console.log(id);
-
-//     const query = {
-//         _id: new ObjectId(id)
-//     }
-
-//     try {
-
-//         const deletePrompt = await prompts.deleteOne(query);
-
-//         console.log(deletePrompt);
-
-//         res.status(200).send({
-//             success: true,
-//             message: 'Delete prompt successfully',
-//             data: deletePrompt
-//         });
-
-//     } catch (error) {
-
-//         console.log(error);
-//         res.status(500).send({
-//             success: false,
-//             message: 'Delete prompt failed',
-//             error: error.message
-//         });
-//     }
-// });
-
-
 app.delete('/api/prompt/:id', verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
@@ -631,11 +603,7 @@ app.delete('/api/prompt/:id', verifyToken, async (req, res) => {
             error: error.message
         });
     }
-});
-
-
-
-
+})
 
 app.patch('/api/prompts/:id', async (req, res) => {
 
@@ -687,9 +655,7 @@ app.patch('/api/prompts/:id/copy', verifyToken, async (req, res) => {
 });
 
 
-
-
-app.post('/api/bookmarks', async (req, res) => {
+app.post('/api/bookmarks', verifyToken, async (req, res) => {
     try {
         const bookmark = req.body;
 
@@ -763,7 +729,6 @@ app.get('/api/reports/check', async (req, res) => {
 
 
 
-
 app.get('/api/my/bookmarks', verifyToken, async (req, res) => {
     try {
         const query = {};
@@ -824,7 +789,6 @@ app.delete('/api/bookmarks/:id', verifyToken, async (req, res) => {
 
 
 
-
 // reviews related api 
 app.post('/api/reviews', verifyToken, async (req, res) => {
     try {
@@ -874,7 +838,8 @@ app.post('/api/reviews', verifyToken, async (req, res) => {
     }
 });
 
-app.get('/api/my/reviews',verifyToken, async (req, res) => {
+
+app.get('/api/my/reviews', verifyToken, async (req, res) => {
     try {
         const query = {};
         if (req.query.userId) {
@@ -901,8 +866,6 @@ app.get('/api/my/reviews',verifyToken, async (req, res) => {
 
 
 
-
-
 app.get('/api/reviews', async (req, res) => {
     try {
 
@@ -922,8 +885,6 @@ app.get('/api/reviews', async (req, res) => {
         })
     }
 });
-
-
 
 app.get('/api/prompt/reviews', verifyToken, async (req, res) => {
     try {
@@ -1052,9 +1013,9 @@ app.patch('/api/admin/prompts/:id/reject', verifyToken, verifyAdmin, async (req,
 app.patch('/api/admin/prompts/:id/featured', verifyToken, verifyAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const { isFeatured } = req.body; // বডি থেকে true অথবা false আসবে
+        const { isFeatured } = req.body;
 
-        // ভ্যালিডেশন: বডিতে true/false পাঠানো হয়েছে কিনা চেক করা
+
         if (typeof isFeatured !== 'boolean') {
             return res.status(400).send({
                 success: false,
@@ -1094,16 +1055,16 @@ app.patch('/api/admin/prompts/:id/featured', verifyToken, verifyAdmin, async (re
 
 app.get('/api/admin/analytics', verifyToken, verifyAdmin, async (req, res) => {
     try {
-        // ১. মোট ইউজারের সংখ্যা
+
         const totalUsers = await users.countDocuments();
 
-        // ২. মোট প্রম্পটের সংখ্যা
+
         const totalPrompts = await prompts.countDocuments();
 
-        // ৩. মোট রিভিউর সংখ্যা
+
         const totalReviews = await reviews.countDocuments();
 
-        // ৪. মোট কপির সংখ্যা বের করার লজিক
+
         const copyResult = await prompts.aggregate([
             {
                 $group: {
@@ -1115,7 +1076,7 @@ app.get('/api/admin/analytics', verifyToken, verifyAdmin, async (req, res) => {
 
         const totalCopies = copyResult.length > 0 ? copyResult[0].totalCopies : 0;
 
-        // 📊 ৫. ১ম চার্ট: User Growth (মাসের নাম অনুযায়ী গ্রোথ ট্র্যাক)
+
         const allUsers = await users.find({}).toArray();
         const userMonthsObj = {};
 
@@ -1135,7 +1096,7 @@ app.get('/api/admin/analytics', verifyToken, verifyAdmin, async (req, res) => {
             });
         }
 
-        // 📊 ৬. ২য় চার্ট: Top 5 Copied Prompts (সেরা ৫টি ও ছোট টাইটেল)
+
         const topPromptsRaw = await prompts.find({})
             .sort({ copyCount: -1 })
             .limit(5)
@@ -1152,7 +1113,7 @@ app.get('/api/admin/analytics', verifyToken, verifyAdmin, async (req, res) => {
             };
         });
 
-        // 🚀 রেসপন্স পাঠানো (আপনার আগের ডেটা ফরম্যাট একদম অক্ষত রেখে ভেতরে চার্টের ডেটা দেওয়া হলো)
+
         res.status(200).send({
             success: true,
             data: {
@@ -1160,8 +1121,8 @@ app.get('/api/admin/analytics', verifyToken, verifyAdmin, async (req, res) => {
                 totalPrompts,
                 totalReviews,
                 totalCopies,
-                userGrowthData, // এক্সট্রা চার্ট ডেটা ১
-                topPromptsData  // এক্সট্রা চার্ট ডেটা ২
+                userGrowthData,
+                topPromptsData
             }
         });
 
@@ -1182,7 +1143,7 @@ app.post('/api/reports', verifyToken, async (req, res) => {
     try {
         const report = req.body;
 
-        // বডি থেকে userId এবং promptId আলাদা করা হচ্ছে
+
         const { userId, promptId } = report;
 
         if (!userId || !promptId) {
@@ -1192,18 +1153,18 @@ app.post('/api/reports', verifyToken, async (req, res) => {
             });
         }
 
-        // ডাটাবেজে চেক করা হচ্ছে এই ইউজার এই প্রম্পটে অলরেডি রিপোর্ট দিয়েছে কিনা
+
         const existingReport = await reports.findOne({ userId: userId, promptId: promptId });
 
         if (existingReport) {
             return res.status(400).send({
                 success: false,
-                alreadyReported: true, // ফ্রন্টেন্ডে ট্র্যাকিং সহজ করার জন্য
+                alreadyReported: true,
                 message: 'You have already reported this prompt.'
             });
         }
 
-        // অলরেডি রিপোর্ট না থাকলে নতুন রিপোর্ট ডাটাবেজে সেভ হবে
+
         const result = await reports.insertOne(report);
 
         res.status(200).send({
@@ -1274,6 +1235,81 @@ app.delete('/api/admin/reports/:id', verifyToken, verifyAdmin, async (req, res) 
     }
 });
 
+// admin report and warning related api
+app.post('/api/admin/warn-creator', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+        const { reportId, creatorId, promptTitle } = req.body;
+
+        if (!reportId || !creatorId) {
+            return res.status(400).send({ success: false, message: "Missing parameters." });
+        }
+
+
+        await warnings.insertOne({
+            userId: new ObjectId(creatorId),
+            reportId: new ObjectId(reportId),
+            promptTitle: promptTitle || 'Unspecified',
+            message: `Your prompt "${promptTitle || 'Unspecified'}" was reported for violating community guidelines. Please review our policy.`,
+            date: new Date(),
+            isRead: false
+        });
+
+
+        await reports.deleteOne({ _id: new ObjectId(reportId) });
+
+        res.status(200).send({
+            success: true,
+            message: "Warning issued successfully in separate collection and report cleared."
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).send({ success: false, message: "Server error", error: error.message });
+    }
+});
+
+app.get('/api/creator/warnings', verifyToken, async (req, res) => {
+    try {
+
+        const userId = req.user._id;
+
+        const creatorWarnings = await db.collection("warnings")
+            .find({ userId: new ObjectId(userId) })
+            .sort({ date: -1 })
+            .toArray();
+
+        res.status(200).send({ success: true, data: creatorWarnings });
+    } catch (error) {
+        res.status(500).send({ success: false, message: "Failed to fetch warnings" });
+    }
+});
+
+app.delete('/api/admin/delete-reported-prompt', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+
+        const { reportId, promptId } = req.query;
+
+        if (!reportId || !promptId) {
+            return res.status(400).send({ success: false, message: "Missing reportId or promptId parameters." });
+        }
+
+
+        const [promptResult, reportResult] = await Promise.all([
+            db.collection("prompts").deleteOne({ _id: new ObjectId(promptId) }),
+            db.collection("reports").deleteOne({ _id: new ObjectId(reportId) })
+        ]);
+
+        res.status(200).send({
+            success: true,
+            message: "Prompt permanently removed and report cleared successfully."
+        });
+
+    } catch (error) {
+        console.error("Delete Action Error:", error);
+        res.status(500).send({ success: false, message: "Server error", error: error.message });
+    }
+});
+
 
 
 
@@ -1321,7 +1357,6 @@ app.post('/api/subscriptions', verifyToken, async (req, res) => {
     }
 });
 
-
 app.get('/api/admin/subscriptions', verifyToken, verifyAdmin, async (req, res) => {
     try {
 
@@ -1341,8 +1376,6 @@ app.get('/api/admin/subscriptions', verifyToken, verifyAdmin, async (req, res) =
         })
     }
 });
-
-
 
 
 // creator related api
@@ -1404,7 +1437,7 @@ app.get('/api/top/creators', async (req, res) => {
                     email: "$userDetails.email"
                 }
             }
-        ]).toArray();
+        ]).limit(3).toArray();
 
         res.send({ success: true, data: result });
     } catch (error) {
